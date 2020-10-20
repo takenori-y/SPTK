@@ -13,10 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: make
-      run: make
     - name: setup test env
-      run: cd tools; make
+      run: cd tools; make bats.done cpplint.done sptk.done
     - name: make format
       run: make format
     - name: make test
