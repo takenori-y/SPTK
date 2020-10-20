@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: setup
+      run: apt-get install csh
     - name: setup test env
       run: cd tools; make bats.done cpplint.done sptk.done
     - name: make format
