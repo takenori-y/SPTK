@@ -13,10 +13,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: setup
+    - name: install packages
       run: sudo apt-get install csh clang-format
-    - name: setup test env
+    - name: setup
       run: cd tools; make bats.done cpplint.done sptk.done
+    - name: make
+      run: make
     - name: make format
       run: make format
     - name: make test
