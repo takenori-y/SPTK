@@ -3,13 +3,9 @@ name: C/C++ CI
 on:
   push:
     branches:
-      - '*'
-      - '*/*'
-      - '**'
+      - master
   pull_request:
     branches:
-      - '*'
-      - '*/*'
       - '**'
 
 jobs:
@@ -20,6 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install packages
+      run: sudo apt-get update
       run: sudo apt-get install csh clang-format valgrind
     - name: setup
       run: cd tools; make bats.done cpplint.done sptk.done
