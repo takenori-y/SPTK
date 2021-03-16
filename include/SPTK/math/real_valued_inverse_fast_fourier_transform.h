@@ -56,7 +56,7 @@ namespace sptk {
  * Calculate inverse DFT of real-valued input data.
  *
  * This is almost similar to RealValuedFastFourierTransform. The DFT results
- * are divided by FFT length \f$L\f$.
+ * are divided by the FFT length @f$L@f$.
  */
 class RealValuedInverseFastFourierTransform {
  public:
@@ -79,13 +79,13 @@ class RealValuedInverseFastFourierTransform {
   };
 
   /**
-   * @param[in] fft_length FFT length, \f$L\f$.
+   * @param[in] fft_length FFT length, @f$L@f$.
    */
   explicit RealValuedInverseFastFourierTransform(int fft_length);
 
   /**
-   * @param[in] num_order Order of input, \f$M\f$.
-   * @param[in] fft_length FFT length, \f$L\f$.
+   * @param[in] num_order Order of input, @f$M@f$.
+   * @param[in] fft_length FFT length, @f$L@f$.
    */
   RealValuedInverseFastFourierTransform(int num_order, int fft_length);
 
@@ -107,16 +107,16 @@ class RealValuedInverseFastFourierTransform {
   }
 
   /**
-   * @return True if this obejct is valid.
+   * @return True if this object is valid.
    */
   bool IsValid() const {
     return fast_fourier_transform_.IsValid();
   }
 
   /**
-   * @param[in] real_part_input Real part of input.
-   * @param[out] real_part_output Real part of output.
-   * @param[out] imag_part_output Imaginary part of output.
+   * @param[in] real_part_input @f$M@f$-th order real part of input.
+   * @param[out] real_part_output @f$L@f$-length real part of output.
+   * @param[out] imag_part_output @f$L@f$-length imaginary part of output.
    * @param[out] buffer Buffer.
    * @return True on success, false on failure.
    */

@@ -51,7 +51,7 @@
 #include <vector>    // std::vector
 
 #include "SPTK/math/entropy_calculation.h"
-#include "SPTK/math/statistics_accumulator.h"
+#include "SPTK/math/statistics_accumulation.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -89,55 +89,55 @@ void PrintUsage(std::ostream* stream) {
 }  // namespace
 
 /**
- * \a entropy [ \e option ] [ \e infile ]
+ * @a entropy [ @e option ] [ @e infile ]
  *
- * - \b -l \e int
- *   - number of elements \f$(1 \le N)\f$
- * - \b -o \e int
- *   - output format \f$O\f$
- *     \arg \c 0 bit
- *     \arg \c 1 nat
- *     \arg \c 2 dit
- * - \b -f \e bool
+ * - @b -l @e int
+ *   - number of elements @f$(1 \le N)@f$
+ * - @b -o @e int
+ *   - output format @f$O@f$
+ *     \arg @c 0 bit
+ *     \arg @c 1 nat
+ *     \arg @c 2 dit
+ * - @b -f @e bool
  *   - output entropy frame by frame
- * - \b infile \e str
+ * - @b infile @e str
  *   - double-type probability sequence
- * - \b stdout
+ * - @b stdout
  *   - double-type entropy
  *
  * The input is a set of probabilities:
- * \f[
+ * @f[
  *   \begin{array}{ccc}
  *     \underbrace{p_1(1),\,p_1(2),\,\ldots,\,p_1(N)}_{\boldsymbol{p}(0)}, &
  *     \underbrace{p_2(1),\,p_2(2),\,\ldots,\,p_2(N)}_{\boldsymbol{p}(1)}, &
  *     \ldots,
  *   \end{array}
- * \f]
- * If \c -f option is given, the output sequence is
- * \f[
+ * @f]
+ * If @c -f option is given, the output sequence is
+ * @f[
  *   \begin{array}{cccc}
  *     H(0), & H(1), & H(2), & \ldots,
  *   \end{array}
- * \f]
- * where \f$H(t)\f$ is the entropy at \f$t\f$-th frame:
- * \f[
+ * @f]
+ * where @f$H(t)@f$ is the entropy at @f$t@f$-th frame:
+ * @f[
  *   H(t) = -\sum_{n=1}^{N} p_t(n) \log_b p_t(n)
  *        = -\boldsymbol{p}(t)^\mathsf{T} \log_b \boldsymbol{p}(t).
- * \f]
- * The base \f$b\f$ depends on the value of \f$O\f$:
- * \f[
+ * @f]
+ * The base @f$b@f$ depends on the value of @f$O@f$:
+ * @f[
  *   b = \left\{\begin{array}{ll}
  *     2,\quad & O = 0 \\
  *     e,      & O = 1 \\
  *     10.     & O = 2 \\
  *   \end{array}\right.
- * \f]
- * If \c -f option is not given, only the average of the entropies,
- * \f$\bar{H}\f$, is sent to the standard output:
- * \f[
+ * @f]
+ * If @c -f option is not given, only the average of the entropies,
+ * @f$\bar{H}@f$, is sent to the standard output:
+ * @f[
  *   \bar{H} = \frac{1}{T} \sum_{t=0}^{T-1} H(t),
- * \f]
- * where \f$T\f$ is the number of the set of probabilities.
+ * @f]
+ * where @f$T@f$ is the number of the set of probabilities.
  *
  * The below example calculates maximum value of entropy:
  *
@@ -221,10 +221,10 @@ int main(int argc, char* argv[]) {
   }
   std::istream& input_stream(ifs.fail() ? std::cin : ifs);
 
-  sptk::StatisticsAccumulator statistics_accumulator(0, 1);
-  sptk::StatisticsAccumulator::Buffer buffer;
+  sptk::StatisticsAccumulation statistics_accumulation(0, 1);
+  sptk::StatisticsAccumulation::Buffer buffer;
   sptk::EntropyCalculation entropy_calculation(num_element, entropy_unit);
-  if (!statistics_accumulator.IsValid() || !entropy_calculation.IsValid()) {
+  if (!statistics_accumulation.IsValid() || !entropy_calculation.IsValid()) {
     std::ostringstream error_message;
     error_message << "Failed to initialize EntropyCalculation";
     sptk::PrintErrorMessage("entropy", error_message);
@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) {
         return 1;
       }
     } else {
-      if (!statistics_accumulator.Run(std::vector<double>{entropy}, &buffer)) {
+      if (!statistics_accumulation.Run(std::vector<double>{entropy}, &buffer)) {
         std::ostringstream error_message;
         error_message << "Failed to accumulate statistics";
         sptk::PrintErrorMessage("entropy", error_message);
@@ -261,7 +261,7 @@ int main(int argc, char* argv[]) {
   }
 
   int num_data;
-  if (!statistics_accumulator.GetNumData(buffer, &num_data)) {
+  if (!statistics_accumulation.GetNumData(buffer, &num_data)) {
     std::ostringstream error_message;
     error_message << "Failed to accumulate statistics";
     sptk::PrintErrorMessage("entropy", error_message);
@@ -270,7 +270,7 @@ int main(int argc, char* argv[]) {
 
   if (!output_frame_by_frame && 0 < num_data) {
     std::vector<double> average_entropy(1);
-    if (!statistics_accumulator.GetMean(buffer, &average_entropy)) {
+    if (!statistics_accumulation.GetMean(buffer, &average_entropy)) {
       std::ostringstream error_message;
       error_message << "Failed to calculate entropy";
       sptk::PrintErrorMessage("entropy", error_message);

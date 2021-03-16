@@ -54,21 +54,21 @@ teardown() {
    rm -rf tmp
 }
 
-@test "lpc2par: compatibility" {
+@test "lpc2par: compatibility (g = 1)" {
    $sptk3/nrand -l 20 | $sptk3/lpc2par -m 9 > tmp/1
    $sptk3/nrand -l 20 | $sptk4/lpc2par -m 9 > tmp/2
    run $sptk4/aeq tmp/1 tmp/2
    [ "$status" -eq 0 ]
 }
 
-@test "lpc2par: compatibility (g != 1)" {
+@test "lpc2par: compatibility (g < 1)" {
    $sptk3/nrand -l 20 | $sptk3/lpc2par -m 9 -g 0.5 > tmp/1
    $sptk3/nrand -l 20 | $sptk4/lpc2par -m 9 -g 0.5 > tmp/2
    run $sptk4/aeq tmp/1 tmp/2
    [ "$status" -eq 0 ]
 }
 
-@test "lpc2par: reversiblity" {
+@test "lpc2par: reversibility" {
    $sptk3/nrand -l 20 > tmp/1
    $sptk4/lpc2par -m 9 tmp/1 | $sptk4/par2lpc -m 9 > tmp/2
    run $sptk4/aeq tmp/1 tmp/2
