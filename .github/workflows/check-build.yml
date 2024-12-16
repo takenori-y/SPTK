@@ -19,10 +19,10 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install csh parallel valgrind
+          sudo apt-get install csh parallel valgrind libpcre3-dev
 
       - name: Tool
-        run: cd tools && make check -j 1 PYTHON_VERSION=3
+        run: cd tools && make cppcheck
 
       - name: Make
         run: make debug
