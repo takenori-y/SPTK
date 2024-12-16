@@ -10,7 +10,7 @@ on:
 
 jobs:
   ubuntu-latest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Clone
@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install csh parallel valgrind
 
       - name: Tool
-        run: cd tools && make check -j 4 PYTHON_VERSION=3
+        run: cd tools && make check -j 1 PYTHON_VERSION=3
 
       - name: Make
         run: make debug
