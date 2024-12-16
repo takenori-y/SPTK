@@ -16,9 +16,10 @@
 
 #include "SPTK/analysis/pitch_extraction_by_reaper.h"
 
-#include <algorithm>  // std::copy, std::fill
+#include <algorithm>  // std::copy, std::fill, std::transform
 #include <cmath>      // std::ceil
 #include <cstdint>    // int16_t
+#include <vector>     // std::vector
 
 #include "REAPER/epoch_tracker/epoch_tracker.h"
 
@@ -36,9 +37,8 @@ PitchExtractionByReaper::PitchExtractionByReaper(int frame_shift,
       voicing_threshold_(voicing_threshold),
       is_valid_(true) {
   if (frame_shift_ <= 0 || sampling_rate_ / 2 <= upper_f0_ ||
-      (sampling_rate_ <= reaper::kMinSampleRate || 98000.0 <= sampling_rate_) ||
-      (lower_f0_ <= 10.0 || upper_f0_ <= lower_f0_) ||
-      (voicing_threshold_ < -0.5 || 1.6 < voicing_threshold_)) {
+      (sampling_rate_ <= reaper::kMinSampleRate || 98000.0 < sampling_rate_) ||
+      (lower_f0_ <= 10.0 || upper_f0_ <= lower_f0_)) {
     is_valid_ = false;
     return;
   }
@@ -55,11 +55,14 @@ bool PitchExtractionByReaper::Get(
 
   reaper::EpochTracker epoch_tracker;
   epoch_tracker.set_unvoiced_cost(static_cast<float>(voicing_threshold_));
-  std::vector<int16_t> integer_waveform(waveform.begin(), waveform.end());
-  if (!epoch_tracker.Init(
-          &(integer_waveform[0]), static_cast<int32_t>(waveform.size()),
-          static_cast<float>(sampling_rate_), static_cast<float>(lower_f0_),
-          static_cast<float>(upper_f0_), true, false)) {
+  std::vector<int16_t> integer_waveform(waveform.size());
+  std::transform(waveform.begin(), waveform.end(), integer_waveform.begin(),
+                 [](double x) { return static_cast<int16_t>(x); });
+  if (!epoch_tracker.Init(integer_waveform.data(),
+                          static_cast<int32_t>(integer_waveform.size()),
+                          static_cast<float>(sampling_rate_),
+                          static_cast<float>(lower_f0_),
+                          static_cast<float>(upper_f0_), true, false)) {
     return false;
   }
 
@@ -125,8 +128,6 @@ bool PitchExtractionByReaper::Get(
       if (voicing[i]) output[j++] = times[i];
     }
   }
-
-  epoch_tracker.CleanUp();
 
   return true;
 }

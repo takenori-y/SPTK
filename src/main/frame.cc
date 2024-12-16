@@ -22,7 +22,7 @@
 #include <sstream>    // std::ostringstream
 #include <vector>     // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -93,13 +93,13 @@ bool WriteData(const std::vector<double>& data, bool zero_mean) {
  *
  * - @b -l @e int
  *   - frame length @f$(1 \le L)@f$
- * - @b -p @e double
+ * - @b -p @e int
  *   - frame period @f$(1 \le P)@f$
  * - @b -n @e int
  *   - framing type
  *     \arg @c 0 the beginning of data is the center of the first frame
  *     \arg @c 1 the beginning of data is the start of the first frame
- * - @b -z @e bool
+ * - @b -z
  *   - perform mean subtraction in a frame
  * - @b infile @e str
  *   - double-type data sequence
@@ -215,15 +215,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_rest_args ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("frame", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("frame", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   std::vector<double> data(frame_length);
   int actual_read_size;
@@ -253,18 +262,19 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  int center;
+  if (kBegginingOfDataIsCenterOfFirstFrame == framing_type) {
+    center = frame_length / 2;
+  } else if (kBegginingOfDataIsStartOfFirstFrame == framing_type) {
+    center = 0;
+  } else {
+    return 0;
+  }
+
   // Extract the remaining frames.
   const int overlap(frame_length - frame_period);
   if (0 < overlap) {
     bool is_eof(input_stream.peek() == std::ios::traits_type::eof());
-    int center;
-    if (kBegginingOfDataIsCenterOfFirstFrame == framing_type) {
-      center = frame_length / 2;
-    } else if (kBegginingOfDataIsStartOfFirstFrame == framing_type) {
-      center = 0;
-    } else {
-      return 0;
-    }
     int last_data_position_in_frame(center + actual_read_size - 1);
     while (center <= last_data_position_in_frame) {
       if (is_eof) {
@@ -304,7 +314,11 @@ int main(int argc, char* argv[]) {
     }
 
     while (sptk::ReadStream(true, -overlap, 0, frame_length, &data,
-                            &input_stream, NULL)) {
+                            &input_stream, &actual_read_size)) {
+      if (kBegginingOfDataIsCenterOfFirstFrame == framing_type &&
+          actual_read_size <= center) {
+        break;
+      }
       if (!WriteData(data, zero_mean)) {
         return 1;
       }

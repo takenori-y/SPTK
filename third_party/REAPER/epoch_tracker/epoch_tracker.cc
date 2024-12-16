@@ -43,6 +43,7 @@ EpochTracker::EpochTracker(void) : sample_rate_(-1.0) {
 }
 
 EpochTracker::~EpochTracker(void) {
+  CleanUp();
 }
 
 static inline int32_t RoundUp(float val) {
@@ -595,7 +596,7 @@ void EpochTracker::GetPulseCorrelations(float window_dur, float peak_thresh) {
 }
 
 
-void EpochTracker::Window(const std::vector<float> input, int32_t offset, size_t size,
+void EpochTracker::Window(const std::vector<float>& input, int32_t offset, size_t size,
                           float* output) {
   if (size != window_.size()) {
     window_.resize(size);
@@ -806,7 +807,9 @@ bool EpochTracker::TrackEpochs(void) {
 void EpochTracker::CreatePeriodLattice(void) {
   int32_t low_period = RoundUp(sample_rate_ / max_f0_search_);
   int32_t high_period = RoundUp(sample_rate_ / min_f0_search_);
+#if 0
   int32_t total_cands = 0;
+#endif
 
   //  For each pulse in the normalized residual...
   for (size_t peak = 0; peak < resid_peaks_.size(); ++peak) {
@@ -891,7 +894,9 @@ void EpochTracker::CreatePeriodLattice(void) {
         v_cand->best_prev_cand = -1;
         resid_peaks_[peak].future.push_back(v_cand);
         resid_peaks_[npeak].past.push_back(v_cand);
+#if 0
         total_cands++;
+#endif
         next_cands_created++;
         if (resid_peaks_[npeak].resid_index >= max_period) {
           break;  // Exit the search only after at least one peak has
@@ -905,7 +910,9 @@ void EpochTracker::CreatePeriodLattice(void) {
       // was at least one voiced hyp.
       resid_peaks_[peak].future.push_back(uv_cand);
       resid_peaks_[uv_cand->end_peak].past.push_back(uv_cand);
+#if 0
       total_cands++;
+#endif
     } else {
       delete uv_cand;
     }
@@ -966,7 +973,9 @@ void EpochTracker::CreatePeriodLattice(void) {
             unvoiced_cost_ + reward_;
         resid_peaks_[start_peak].future.push_back(uv_cand);
         resid_peaks_[peak].past.push_back(uv_cand);
+#if 0
         total_cands++;
+#endif
       }
     }
   }  // end of the first pass at all pulses in the residual.
@@ -1033,6 +1042,10 @@ void EpochTracker::DoDynamicProgramming(void) {
 
 
 bool EpochTracker::BacktrackAndSaveOutput(void) {
+  if (resid_peaks_.size() == 0) {
+    fprintf(stderr, "Can't backtrack with no residual peaks\n");
+    return false;
+  }
   //  Now find the best period hypothesis at the end of the signal,
   //  and backtrack from there.
   float min_cost = 1.0e30;
@@ -1181,6 +1194,11 @@ bool EpochTracker::ResampleAndReturnResults(float resample_interval,
   for (int32_t i = limit; i >= 0; --i) {
     int32_t frame = RoundUp(output_[i].resid_index /
                             (sample_rate_ * resample_interval));
+#if 1
+    if (frame >= n_frames) {
+      frame = n_frames - 1;
+    }
+#endif
     (*f0)[frame] = output_[i].f0;
     (*correlations)[frame] = output_[i].nccf_value;
     if ((frame - prev_frame) > 1) {
@@ -1219,6 +1237,7 @@ bool EpochTracker::WriteDebugData(const std::vector<float>& data,
   }
   size_t  written = fwrite(&(data.front()), sizeof(data.front()),
                            data.size(), out);
+  fclose(out);
   if (written != data.size()) {
     fprintf(stderr, "Problems writing debug data (%d %d)\n",
             static_cast<int>(written), static_cast<int>(data.size()));

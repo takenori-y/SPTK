@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ------------------------------------------------------------------------ #
 # Copyright 2021 SPTK Working Group                                        #
 #                                                                          #
@@ -15,7 +15,6 @@
 # limitations under the License.                                           #
 # ------------------------------------------------------------------------ #
 
-import argparse
 import os
 import sys
 
@@ -26,44 +25,8 @@ import sptk.draw_utils as utils
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description="draw a running log spectrum graph")
-    parser.add_argument(
-        metavar="infile",
-        dest="in_file",
-        default=None,
-        nargs="?",
-        type=str,
-        help="log spectrum (double)",
-    )
-    parser.add_argument(
-        metavar="outfile",
-        dest="out_file",
-        type=str,
-        help="figure",
-    )
-    parser.add_argument(
-        "-F",
-        metavar="F",
-        dest="factor",
-        default=1.0,
-        type=float,
-        help="scale of figure",
-    )
-    parser.add_argument(
-        "-W",
-        metavar="W",
-        dest="width",
-        default=None,
-        type=int,
-        help="width of figure [px]",
-    )
-    parser.add_argument(
-        "-H",
-        metavar="H",
-        dest="height",
-        default=None,
-        type=int,
-        help="height of figure [px]",
+    parser = utils.get_default_parser(
+        "draw a running log spectrum", input_name="log spectrum", allow_dtype=False
     )
     parser.add_argument(
         "-g",
@@ -105,7 +68,7 @@ def get_arguments():
         "-z",
         metavar="z",
         dest="bias",
-        default=20.0,
+        default=20,
         type=float,
         help="distance between spectra",
     )
@@ -116,6 +79,14 @@ def get_arguments():
         default=1,
         type=float,
         help="sampling rate [kHz]",
+    )
+    parser.add_argument(
+        "-y",
+        metavar="y",
+        dest="margin_factor",
+        default=2,
+        type=float,
+        help="margin factor",
     )
     parser.add_argument(
         "-ls",
@@ -137,8 +108,8 @@ def get_arguments():
         "-lw",
         metavar="lw",
         dest="line_width",
-        default=1,
-        type=int,
+        default=None,
+        type=float,
         help="line width",
     )
     return parser.parse_args()
@@ -153,6 +124,8 @@ def get_arguments():
 #   - width of figure in pixels
 # - @b -H @e int
 #   - height of figure in pixels
+# - @b -M @e int or str
+#   - margin around image in pixels
 # - @b -g
 #   - draw grid
 # - @b -t
@@ -167,14 +140,18 @@ def get_arguments():
 #   - distance between spectra in decibels
 # - @b -x @e float
 #   - sampling rate in kHz
-# - @b -y @e float @e float
-#   - y-axis limits
+# - @b -y @e float
+#   - margin factor
 # - @b -ls @e str
 #   - line style (solid, dash, dot, or dashdot)
 # - @b -lc @e str
 #   - line color
-# - @b -lw @e int
+# - @b -lw @e float
 #   - line width
+# - @b -ff @e str
+#   - font family
+# - @b -fs @e int
+#   - font size
 # - @b infile @e str
 #   - double-type log spectrum
 # - @b outfile @e str
@@ -203,15 +180,23 @@ def main():
         x *= args.sr * 0.5  # Multiply Nyquist frequency.
     if args.transpose:
         x = np.flip(x)
-    ys = data[args.start_frame_number : args.end_frame_number]
+    ys = data[
+        args.start_frame_number : (
+            None if args.end_frame_number is None else args.end_frame_number + 1
+        )
+    ]
 
     fig = go.Figure()
+    y_min = np.inf
+    y_max = -np.inf
     for i in range(len(ys)):
         y = ys[i] + (args.bias * i)
+        y_min = np.minimum(y_min, np.min(y))
+        y_max = np.maximum(y_max, np.max(y))
 
         fig.add_trace(
             go.Scatter(
-                x=y if args.transpose else x,
+                x=np.flip(y) if args.transpose else x,
                 y=x if args.transpose else y,
                 line=dict(
                     color=args.line_color,
@@ -225,6 +210,10 @@ def main():
         showgrid=args.grid,
     )
     yaxis = dict(
+        range=(
+            y_min - args.margin_factor * args.bias,
+            y_max + args.margin_factor * args.bias,
+        ),
         showticklabels=False,
         showgrid=False,
         zeroline=False,
@@ -241,6 +230,11 @@ def main():
     fig.update_layout(
         xaxis=yaxis if args.transpose else xaxis,
         yaxis=xaxis if args.transpose else yaxis,
+        font=dict(
+            family=args.font_family,
+            size=args.font_size,
+        ),
+        margin=args.margin,
         showlegend=False,
     )
     fig.write_image(

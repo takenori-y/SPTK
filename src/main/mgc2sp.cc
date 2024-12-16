@@ -22,7 +22,7 @@
 #include <sstream>    // std::ostringstream
 #include <vector>     // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/conversion/mel_generalized_cepstrum_to_spectrum.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -98,9 +98,9 @@ void PrintUsage(std::ostream* stream) {
  *   - gamma @f$(|\gamma| \le 1)@f$
  * - @b -c @e int
  *   - gamma @f$\gamma = -1 / C@f$ @f$(1 \le C)@f$
- * - @b -n @e bool
+ * - @b -n
  *   - regard as normalized mel-generalized cepstrum
- * - @b -u @e bool
+ * - @b -u
  *   - regard as multiplied by gamma
  * - @b -l @e int
  *   - FFT length @f$(2 \le N)@f$
@@ -248,15 +248,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("mgc2sp", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("mgc2sp", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::MelGeneralizedCepstrumToSpectrum mel_generalized_cepstrum_to_spectrum(
       num_order, alpha, gamma, normalization_flag, multiplication_flag,

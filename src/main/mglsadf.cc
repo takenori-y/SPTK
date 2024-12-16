@@ -22,7 +22,7 @@
 #include <sstream>    // std::ostringstream
 #include <vector>     // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/conversion/generalized_cepstrum_gain_normalization.h"
 #include "SPTK/conversion/mel_cepstrum_to_mlsa_digital_filter_coefficients.h"
 #include "SPTK/filter/mglsa_digital_filter.h"
@@ -96,22 +96,22 @@ class InputSourcePreprocessingForMelCepstrum
     }
   }
 
-  ~InputSourcePreprocessingForMelCepstrum() {
+  ~InputSourcePreprocessingForMelCepstrum() override {
   }
 
   bool GetGainFlag() const {
     return gain_flag_;
   }
 
-  virtual int GetSize() const {
+  int GetSize() const override {
     return source_ ? source_->GetSize() : 0;
   }
 
-  virtual bool IsValid() const {
+  bool IsValid() const override {
     return is_valid_;
   }
 
-  virtual bool Get(std::vector<double>* mlsa_digital_filter_coefficients) {
+  bool Get(std::vector<double>* mlsa_digital_filter_coefficients) override {
     if (!is_valid_) {
       return false;
     }
@@ -182,9 +182,9 @@ class InputSourcePreprocessingForMelCepstrum
  *   - interpolation period @f$(0 \le I \le P/2)@f$
  * - @b -P @e int
  *   - order of Pade approximation @f$(4 \le L \le 7)@f$
- * - @b -t @e bool
+ * - @b -t
  *   - transpose filter
- * - @b -k @e bool
+ * - @b -k
  *   - filtering without gain
  * - @b mgcfile @e str
  *   - double-type mel-generalized cepstral coefficients
@@ -193,8 +193,8 @@ class InputSourcePreprocessingForMelCepstrum
  * - @b stdout
  *   - double-type output sequence
  *
- * In the below example, an exciation signal generated from pitch information is
- * passed through the MLSA filter built from mel-cepstral coefficients
+ * In the below example, an excitation signal generated from pitch information
+ * is passed through the MLSA filter built from mel-cepstral coefficients
  * @c data.mcep.
  *
  * @code{.sh}
@@ -333,6 +333,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if (!sptk::SetBinaryMode()) {
+    std::ostringstream error_message;
+    error_message << "Cannot set translation mode";
+    sptk::PrintErrorMessage("mglsadf", error_message);
+    return 1;
+  }
+
   // Open stream for reading filter coefficients.
   std::ifstream ifs1;
   ifs1.open(filter_coefficients_file, std::ios::in | std::ios::binary);
@@ -346,14 +353,16 @@ int main(int argc, char* argv[]) {
 
   // Open stream for reading input signals.
   std::ifstream ifs2;
-  ifs2.open(filter_input_file, std::ios::in | std::ios::binary);
-  if (ifs2.fail() && NULL != filter_input_file) {
-    std::ostringstream error_message;
-    error_message << "Cannot open file " << filter_input_file;
-    sptk::PrintErrorMessage("mglsadf", error_message);
-    return 1;
+  if (NULL != filter_input_file) {
+    ifs2.open(filter_input_file, std::ios::in | std::ios::binary);
+    if (ifs2.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << filter_input_file;
+      sptk::PrintErrorMessage("mglsadf", error_message);
+      return 1;
+    }
   }
-  std::istream& stream_for_filter_input(ifs2.fail() ? std::cin : ifs2);
+  std::istream& stream_for_filter_input(ifs2.is_open() ? ifs2 : std::cin);
 
   // Prepare variables for filtering.
   const int filter_length(num_filter_order + 1);

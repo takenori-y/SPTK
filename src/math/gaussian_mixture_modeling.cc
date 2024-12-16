@@ -17,12 +17,12 @@
 #include "SPTK/math/gaussian_mixture_modeling.h"
 
 #include <algorithm>  // std::fill, std::transform
-#include <cfloat>     // DBL_MAX
 #include <cmath>      // std::exp, std::log
 #include <cstddef>    // std::size_t
 #include <iomanip>    // std::setw
 #include <iostream>   // std::cerr, std::endl
 #include <numeric>    // std::accumulate, std::partial_sum
+#include <vector>     // std::vector
 
 #include "SPTK/compression/linde_buzo_gray_algorithm.h"
 #include "SPTK/math/statistics_accumulation.h"
@@ -83,7 +83,7 @@ GaussianMixtureModeling::GaussianMixtureModeling(
       is_diagonal_(kDiagonal == covariance_type_ && 1 == block_size_.size()),
       is_valid_(true) {
   if (num_order_ < 0 || num_mixture_ <= 0 ||
-      (kKMeans == initialization_type_ && !IsPowerOfTwo(num_mixture_)) ||
+      (kKMeans == initialization_type_ && !sptk::IsPowerOfTwo(num_mixture_)) ||
       num_iteration_ <= 0 || convergence_threshold_ < 0.0 ||
       weight_floor_ < 0.0 || 1.0 / num_mixture_ < weight_floor_ ||
       variance_floor_ < 0.0 || log_interval <= 0 ||
@@ -165,10 +165,12 @@ bool GaussianMixtureModeling::Run(
     const std::vector<std::vector<double> >& input_vectors,
     std::vector<double>* weights,
     std::vector<std::vector<double> >* mean_vectors,
-    std::vector<SymmetricMatrix>* covariance_matrices) const {
+    std::vector<SymmetricMatrix>* covariance_matrices,
+    double* total_log_likelihood) const {
   // Check inputs.
   if (!is_valid_ || input_vectors.empty() || NULL == weights ||
-      NULL == mean_vectors || NULL == covariance_matrices) {
+      NULL == mean_vectors || NULL == covariance_matrices ||
+      NULL == total_log_likelihood) {
     return false;
   }
 
@@ -213,7 +215,7 @@ bool GaussianMixtureModeling::Run(
   GaussianMixtureModeling::Buffer buffer;
   std::vector<double> numerators(num_mixture_);
 
-  double prev_log_likelihood(-DBL_MAX);
+  double prev_log_likelihood(sptk::kMin);
 
   for (int n(1); n <= num_iteration_; ++n) {
     // Clear buffers.
@@ -268,8 +270,7 @@ bool GaussianMixtureModeling::Run(
         (*weights)[k] = buffer0[k] * z;
       }
     } else {
-      const double z(1.0 /
-                     (num_data + std::accumulate(xi_.begin(), xi_.end(), 0.0)));
+      const double z(1.0 / (num_data + smoothing_parameter_));
       for (int k(0); k < num_mixture_; ++k) {
         (*weights)[k] = (buffer0[k] + xi_[k]) * z;
       }
@@ -280,7 +281,7 @@ bool GaussianMixtureModeling::Run(
     if (0.0 == smoothing_parameter_) {
       for (int k(0); k < num_mixture_; ++k) {
         double* mu(&((*mean_vectors)[k][0]));
-        double z(1.0 / buffer0[k]);
+        const double z(1.0 / buffer0[k]);
         for (int l(0); l <= num_order_; ++l) {
           mu[l] = buffer1[k][l] * z;
         }
@@ -288,7 +289,7 @@ bool GaussianMixtureModeling::Run(
     } else {
       for (int k(0); k < num_mixture_; ++k) {
         double* mu(&((*mean_vectors)[k][0]));
-        double z(1.0 / (buffer0[k] + xi_[k]));
+        const double z(1.0 / (buffer0[k] + xi_[k]));
         for (int l(0); l <= num_order_; ++l) {
           mu[l] = (buffer1[k][l] + xi_[k] * ubm_mean_vectors_[k][l]) * z;
         }
@@ -298,8 +299,8 @@ bool GaussianMixtureModeling::Run(
     // Update covariance matrices.
     if (0.0 == smoothing_parameter_) {
       for (int k(0); k < num_mixture_; ++k) {
-        double* mu(&((*mean_vectors)[k][0]));
-        double z(1.0 / buffer0[k]);
+        const double* mu(&((*mean_vectors)[k][0]));
+        const double z(1.0 / buffer0[k]);
         for (int l(0); l <= num_order_; ++l) {
           for (int m(is_diagonal_ ? l : 0); m <= l; ++m) {
             if (0.0 != mask_[l][m]) {
@@ -311,8 +312,8 @@ bool GaussianMixtureModeling::Run(
       }
     } else {
       for (int k(0); k < num_mixture_; ++k) {
-        double* mu(&((*mean_vectors)[k][0]));
-        double z(1.0 / (buffer0[k] + xi_[k]));
+        const double* mu(&((*mean_vectors)[k][0]));
+        const double z(1.0 / (buffer0[k] + xi_[k]));
         for (int l(0); l <= num_order_; ++l) {
           for (int m(is_diagonal_ ? l : 0); m <= l; ++m) {
             if (0.0 != mask_[l][m]) {
@@ -333,6 +334,7 @@ bool GaussianMixtureModeling::Run(
     FloorVariance(covariance_matrices);
 
     // Check convergence.
+    *total_log_likelihood = log_likelihood;
     log_likelihood /= num_data;
     const double change(log_likelihood - prev_log_likelihood);
     if (0 == n % log_interval_) {
@@ -529,9 +531,10 @@ bool GaussianMixtureModeling::Initialize(
     const double convergence_threshold(1e-5);
     const double splitting_factor(1e-5);
     const int seed(1);
+    double distance;
     LindeBuzoGrayAlgorithm lbg(num_order_, 1, num_mixture_, 1, num_iteration,
                                convergence_threshold, splitting_factor, seed);
-    if (!lbg.Run(input_vectors, mean_vectors, &codebook_indices)) {
+    if (!lbg.Run(input_vectors, mean_vectors, &codebook_indices, &distance)) {
       return false;
     }
   }
@@ -540,7 +543,7 @@ bool GaussianMixtureModeling::Initialize(
   const int num_data(static_cast<int>(input_vectors.size()));
   std::vector<int> num_data_in_cluster(num_mixture_);
   {
-    int* src(&(codebook_indices[0]));
+    const int* src(&(codebook_indices[0]));
     int* dst(&(num_data_in_cluster[0]));
     for (int t(0); t < num_data; ++t) {
       ++dst[src[t]];
@@ -567,7 +570,7 @@ bool GaussianMixtureModeling::Initialize(
     for (int t(0); t < num_data; ++t) {
       const double* x(&(input_vectors[t][0]));
       const int k(codebook_indices[t]);
-      double* mu(&((*mean_vectors)[k][0]));
+      const double* mu(&((*mean_vectors)[k][0]));
       for (int l(0); l <= num_order_; ++l) {
         const double diff1(x[l] - mu[l]);
         for (int m(is_diagonal_ ? l : 0); m <= l; ++m) {

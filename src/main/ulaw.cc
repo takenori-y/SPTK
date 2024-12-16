@@ -19,7 +19,7 @@
 #include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>   // std::ostringstream
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/compression/mu_law_compression.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -54,7 +54,7 @@ void PrintUsage(std::ostream* stream) {
 /**
  * @a ulaw [ @e option ] [ @e infile ]
  *
- * - @b -v @e int
+ * - @b -v @e double
  *   - absolute maximum value of input @f$(0 < V)@f$
  * - @b -u @e double
  *   - compression factor @f$(0 < \mu)@f$
@@ -64,7 +64,7 @@ void PrintUsage(std::ostream* stream) {
  *   - double-type compressed data sequence
  *
  * In the below example, 16-bit data read from @c data.short is compressed to
- * 8-bit ulaw format.
+ * 8-bit u-law format.
  *
  * @code{.sh}
  *   x2x +sd data.short | ulaw | quantize > data.ulaw
@@ -125,15 +125,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("ulaw", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("ulaw", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::MuLawCompression mu_law_compression(abs_max_value, compression_factor);
   if (!mu_law_compression.IsValid()) {

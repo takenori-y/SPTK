@@ -20,7 +20,7 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/conversion/mel_generalized_cepstrum_to_mel_generalized_cepstrum.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -84,9 +84,9 @@ void PrintUsage(std::ostream* stream) {
  *   - input gamma @f$(|\gamma_1| \le 1)@f$
  * - @b -c @e int
  *   - input gamma @f$\gamma_1 = -1 / C_1@f$ @f$(1 \le C_1)@f$
- * - @b -n @e bool
+ * - @b -n
  *   - regard input as normalized mel-generalized cepstrum
- * - @b -u @e bool
+ * - @b -u
  *   - regard input as multiplied by gamma
  * - @b -M @e int
  *   - order of output coefficients @f$(0 \le M_2)@f$
@@ -96,9 +96,9 @@ void PrintUsage(std::ostream* stream) {
  *   - output gamma @f$(|\gamma_2| \le 1)@f$
  * - @b -C @e int
  *   - output gamma @f$\gamma_2 = -1 / C_2@f$ @f$(1 \le C_2)@f$
- * - @b -N @e bool
+ * - @b -N
  *   - regard output as normalized mel-generalized cepstrum
- * - @b -U @e bool
+ * - @b -U
  *   - regard output as multiplied by gamma
  * - @b infile @e str
  *   - double-type mel-generalized cepstral coefficients
@@ -280,15 +280,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("mgc2mgc", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("mgc2mgc", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::MelGeneralizedCepstrumToMelGeneralizedCepstrum
       mel_generalized_cepstrum_transform(

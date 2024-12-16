@@ -20,7 +20,7 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/filter/all_pole_lattice_digital_filter.h"
 #include "SPTK/input/input_source_from_stream.h"
 #include "SPTK/input/input_source_interpolation.h"
@@ -72,7 +72,7 @@ void PrintUsage(std::ostream* stream) {
  *   - frame period @f$(1 \le P)@f$
  * - @b -i @e int
  *   - interpolation period @f$(0 \le I \le P/2)@f$
- * - @b -k @e bool
+ * - @b -k
  *   - filtering without gain
  * - @b kfile @e str
  *   - double-type PARCOR coefficients
@@ -81,8 +81,8 @@ void PrintUsage(std::ostream* stream) {
  * - @b stdout
  *   - double-type output sequence
  *
- * In the below example, an exciation signal generated from pitch information is
- * passed through the synthesis filter built from PARCOR coefficients.
+ * In the below example, an excitation signal generated from pitch information
+ * is passed through the synthesis filter built from PARCOR coefficients.
  *
  * @code{.sh}
  *   excite < data.pitch | ltcdf data.rc > data.syn
@@ -176,6 +176,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if (!sptk::SetBinaryMode()) {
+    std::ostringstream error_message;
+    error_message << "Cannot set translation mode";
+    sptk::PrintErrorMessage("ltcdf", error_message);
+    return 1;
+  }
+
   // Open stream for reading filter coefficients.
   std::ifstream ifs1;
   ifs1.open(filter_coefficients_file, std::ios::in | std::ios::binary);
@@ -189,14 +196,16 @@ int main(int argc, char* argv[]) {
 
   // Open stream for reading input signals.
   std::ifstream ifs2;
-  ifs2.open(filter_input_file, std::ios::in | std::ios::binary);
-  if (ifs2.fail() && NULL != filter_input_file) {
-    std::ostringstream error_message;
-    error_message << "Cannot open file " << filter_input_file;
-    sptk::PrintErrorMessage("ltcdf", error_message);
-    return 1;
+  if (NULL != filter_input_file) {
+    ifs2.open(filter_input_file, std::ios::in | std::ios::binary);
+    if (ifs2.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << filter_input_file;
+      sptk::PrintErrorMessage("ltcdf", error_message);
+      return 1;
+    }
   }
-  std::istream& stream_for_filter_input(ifs2.fail() ? std::cin : ifs2);
+  std::istream& stream_for_filter_input(ifs2.is_open() ? ifs2 : std::cin);
 
   // Prepare variables for filtering.
   const int filter_length(num_filter_order + 1);

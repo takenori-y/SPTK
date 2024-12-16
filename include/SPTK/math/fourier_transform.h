@@ -33,8 +33,7 @@ class FourierTransform {
    */
   class FourierTransformInterface {
    public:
-    virtual ~FourierTransformInterface() {
-    }
+    virtual ~FourierTransformInterface() = default;
 
     /**
      * @return DFT length.
@@ -72,7 +71,7 @@ class FourierTransform {
    */
   explicit FourierTransform(int length);
 
-  ~FourierTransform() {
+  virtual ~FourierTransform() {
     delete fourier_transform_;
   }
 
@@ -106,8 +105,8 @@ class FourierTransform {
   }
 
   /**
-   * @param[in,out] real_part Real part.
-   * @param[in,out] imag_part Imaginary part.
+   * @param[in,out] real_part @f$L@f$-length real part.
+   * @param[in,out] imag_part @f$L@f$-length imaginary part.
    * @return True on success, false on failure.
    */
   bool Run(std::vector<double>* real_part,

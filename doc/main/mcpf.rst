@@ -5,7 +5,9 @@ mcpf
 
 .. doxygenfile:: mcpf.cc
 
-.. seealso:: :ref:`mgcep`  :ref:`amgcep`
+.. seealso::
 
-.. doxygenclass:: sptk::MelCepstrumPostfiltering
-   :members:
+    :ref:`mgcep` :ref:`amgcep`
+
+.. doxygenclass:: sptk::MelCepstrumPostfilter
+    :members:

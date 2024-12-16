@@ -20,9 +20,10 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/generation/delta_calculation.h"
 #include "SPTK/input/input_source_from_stream.h"
+#include "SPTK/utils/misc_utils.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -73,7 +74,7 @@ void PrintUsage(std::ostream* stream) {
  *   - order of vector @f$(0 \le M)@f$
  * - @b -d @e double+
  *   - delta coefficients
- * - @b -D @e string
+ * - @b -D @e str
  *   - filename of double-type delta coefficients
  * - @b -r @e int+
  *   - width of 1st (and 2nd) regression coefficients
@@ -114,8 +115,8 @@ void PrintUsage(std::ostream* stream) {
  *          {\displaystyle\sum_{\tau=-L^{(1)}}^{L^{(1)}} \tau^2}, \\
  *   \Delta^{(2)} x_t &=&
  *     \frac{\displaystyle\sum_{\tau=-L^{(2)}}^{L^{(2)}}
- *           2 (a_0 \tau^2 - a_1) x_{t+\tau}}
- *          {a_2 a_0 - a_1^2},
+ *           (a_0 \tau^2 - a_1) x_{t+\tau}}
+ *          {2 \cdot (a_2 a_0 - a_1^2)},
  * @f}
  * where
  * @f{eqnarray}{
@@ -173,7 +174,8 @@ int main(int argc, char* argv[]) {
       case 'd': {
         if (is_regression_specified) {
           std::ostringstream error_message;
-          error_message << "-d and -r options cannot be specified at the same";
+          error_message
+              << "-d and -r options cannot be specified at the same time";
           sptk::PrintErrorMessage("delta", error_message);
           return 1;
         }
@@ -198,7 +200,8 @@ int main(int argc, char* argv[]) {
       case 'D': {
         if (is_regression_specified) {
           std::ostringstream error_message;
-          error_message << "-D and -r options cannot be specified at the same";
+          error_message
+              << "-D and -r options cannot be specified at the same time";
           sptk::PrintErrorMessage("delta", error_message);
           return 1;
         }
@@ -230,39 +233,29 @@ int main(int argc, char* argv[]) {
         int n;
         // Set first order coefficients.
         {
-          if (!sptk::ConvertStringToInteger(optarg, &n) || n <= 0) {
+          std::vector<double> coefficients;
+          if (!sptk::ConvertStringToInteger(optarg, &n) ||
+              !sptk::ComputeFirstOrderRegressionCoefficients(n,
+                                                             &coefficients)) {
             std::ostringstream error_message;
             error_message
                 << "The argument for the -r option must be positive integer(s)";
             sptk::PrintErrorMessage("delta", error_message);
             return 1;
-          }
-
-          std::vector<double> coefficients(2 * n + 1);
-          const int a1(n * (n + 1) * (2 * n + 1) / 3);
-          const double norm(1.0 / a1);
-          for (int j(-n), i(0); j <= n; ++j, ++i) {
-            coefficients[i] = j * norm;
           }
           window_coefficients.push_back(coefficients);
         }
 
         // Set second order coefficients.
         if (optind < argc && sptk::ConvertStringToInteger(argv[optind], &n)) {
-          if (n <= 0) {
+          std::vector<double> coefficients;
+          if (!sptk::ComputeSecondOrderRegressionCoefficients(n,
+                                                              &coefficients)) {
             std::ostringstream error_message;
             error_message
                 << "The argument for the -r option must be positive integer(s)";
             sptk::PrintErrorMessage("delta", error_message);
             return 1;
-          }
-          std::vector<double> coefficients(2 * n + 1);
-          const int a0(2 * n + 1);
-          const int a1(a0 * n * (n + 1) / 3);
-          const int a2(a1 * (3 * n * n + 3 * n - 1) / 5);
-          const double norm(2.0 / (a2 * a0 - a1 * a1));
-          for (int j(-n), i(0); j <= n; ++j, ++i) {
-            coefficients[i] = (a0 * j * j - a1) * norm;
           }
           window_coefficients.push_back(coefficients);
           ++optind;
@@ -301,15 +294,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("delta", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("delta", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   const int input_length(num_order + 1);
   sptk::InputSourceFromStream input_source(false, input_length, &input_stream);
@@ -318,13 +320,12 @@ int main(int argc, char* argv[]) {
       magic_number);
   if (!delta_calculation.IsValid()) {
     std::ostringstream error_message;
-    error_message << "Failed to initialze DeltaCalculation";
+    error_message << "Failed to initialize DeltaCalculation";
     sptk::PrintErrorMessage("delta", error_message);
     return 1;
   }
 
-  const int output_length(input_length *
-                          static_cast<int>(window_coefficients.size()));
+  const int output_length(delta_calculation.GetSize());
   std::vector<double> output(output_length);
 
   while (delta_calculation.Get(&output)) {

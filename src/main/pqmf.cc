@@ -14,13 +14,14 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <fstream>   // std::ifstream
-#include <iomanip>   // std::setw
-#include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
-#include <sstream>   // std::ostringstream
-#include <vector>    // std::vector
+#include <algorithm>  // std::min
+#include <fstream>    // std::ifstream
+#include <iomanip>    // std::setw
+#include <iostream>   // std::cerr, std::cin, std::cout, std::endl, etc.
+#include <sstream>    // std::ostringstream
+#include <vector>     // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/filter/pseudo_quadrature_mirror_filter_banks.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -32,6 +33,7 @@ const double kDefaultAttenuation(100.0);
 const int kDefaultNumIteration(100);
 const double kDefaultConvergenceThreshold(1e-6);
 const double kDefaultInitialStepSize(1e-2);
+const bool kDefaultDelayCompensation(true);
 
 void PrintUsage(std::ostream* stream) {
   // clang-format off
@@ -47,7 +49,8 @@ void PrintUsage(std::ostream* stream) {
   *stream << "       -a a  : stopband attenuation in dB (double)[" << std::setw(5) << std::right << kDefaultAttenuation          << "][   0 <  a <=   ]" << std::endl;  // NOLINT
   *stream << "       -i i  : number of iterations       (   int)[" << std::setw(5) << std::right << kDefaultNumIteration         << "][   0 <  i <=   ]" << std::endl;  // NOLINT
   *stream << "       -d d  : convergence threshold      (double)[" << std::setw(5) << std::right << kDefaultConvergenceThreshold << "][ 0.0 <= d <=   ]" << std::endl;  // NOLINT
-  *stream << "       -s s  : initial step size          (dobule)[" << std::setw(5) << std::right << kDefaultInitialStepSize      << "][   0 <  s <=   ]" << std::endl;  // NOLINT
+  *stream << "       -s s  : initial step size          (double)[" << std::setw(5) << std::right << kDefaultInitialStepSize      << "][   0 <  s <=   ]" << std::endl;  // NOLINT
+  *stream << "       -r    : disable delay compensation (  bool)[" << std::setw(5) << std::right << sptk::ConvertBooleanToString(!kDefaultDelayCompensation) << "]" << std::endl;  // NOLINT
   *stream << "       -h    : print this message" << std::endl;
   *stream << "  infile:" << std::endl;
   *stream << "       filter-bank input                  (double)[stdin]" << std::endl;  // NOLINT
@@ -76,6 +79,8 @@ void PrintUsage(std::ostream* stream) {
  *   - convergence threshold @f$(0 \le \epsilon)@f$
  * - @b -s @e double
  *   - initial step size @f$(0 < \Delta)@f$
+ * - @b -r
+ *   - disable delay compensation
  * - @b infile @e str
  *   - double-type filter-bank input
  * - @b stdout
@@ -99,9 +104,11 @@ int main(int argc, char* argv[]) {
   int num_iteration(kDefaultNumIteration);
   double convergence_threshold(kDefaultConvergenceThreshold);
   double initial_step_size(kDefaultInitialStepSize);
+  bool delay_compensation(kDefaultDelayCompensation);
 
   for (;;) {
-    const int option_char(getopt_long(argc, argv, "k:m:a:i:d:s:h", NULL, NULL));
+    const int option_char(
+        getopt_long(argc, argv, "k:m:a:i:d:s:rh", NULL, NULL));
     if (-1 == option_char) break;
 
     switch (option_char) {
@@ -171,6 +178,10 @@ int main(int argc, char* argv[]) {
         }
         break;
       }
+      case 'r': {
+        delay_compensation = false;
+        break;
+      }
       case 'h': {
         PrintUsage(&std::cout);
         return 0;
@@ -191,15 +202,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("pqmf", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("pqmf", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::PseudoQuadratureMirrorFilterBanks analysis(
       num_subband, num_filter_order, attenuation, num_iteration,
@@ -214,7 +234,10 @@ int main(int argc, char* argv[]) {
 
   double input;
   std::vector<double> output(num_subband);
+  const int delay(sptk::IsEven(num_filter_order) ? num_filter_order / 2
+                                                 : (num_filter_order - 1) / 2);
 
+  int num_read(0);
   while (sptk::ReadStream(&input, &input_stream)) {
     if (!analysis.Run(input, &output, &buffer)) {
       std::ostringstream error_message;
@@ -222,11 +245,31 @@ int main(int argc, char* argv[]) {
       sptk::PrintErrorMessage("pqmf", error_message);
       return 1;
     }
-    if (!sptk::WriteStream(0, num_subband, output, &std::cout, NULL)) {
-      std::ostringstream error_message;
-      error_message << "Failed to write subband signals";
-      sptk::PrintErrorMessage("pqmf", error_message);
-      return 1;
+    if (!delay_compensation || delay <= num_read++) {
+      if (!sptk::WriteStream(0, num_subband, output, &std::cout, NULL)) {
+        std::ostringstream error_message;
+        error_message << "Failed to write subband signals";
+        sptk::PrintErrorMessage("pqmf", error_message);
+        return 1;
+      }
+    }
+  }
+
+  if (delay_compensation) {
+    const int n(std::min(delay, num_read));
+    for (int i(0); i < n; ++i) {
+      if (!analysis.Run(input, &output, &buffer)) {
+        std::ostringstream error_message;
+        error_message << "Failed to perform PQMF analysis";
+        sptk::PrintErrorMessage("pqmf", error_message);
+        return 1;
+      }
+      if (!sptk::WriteStream(0, num_subband, output, &std::cout, NULL)) {
+        std::ostringstream error_message;
+        error_message << "Failed to write subband signals";
+        sptk::PrintErrorMessage("pqmf", error_message);
+        return 1;
+      }
     }
   }
 

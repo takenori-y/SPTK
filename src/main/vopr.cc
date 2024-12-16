@@ -23,7 +23,7 @@
 #include <sstream>     // std::ostringstream
 #include <vector>      // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -74,7 +74,7 @@ void PrintUsage(std::ostream* stream) {
   *stream << "       -m    : multiplication                          [       a * b ]" << std::endl;  // NOLINT
   *stream << "       -d    : division                                [       a / b ]" << std::endl;  // NOLINT
   *stream << "       -ATAN : arctangent                              [ atan(b / a) ]" << std::endl;  // NOLINT
-  *stream << "       -QM   : quadratic mean                          [ sqrt(a^2 + b^2 / 2) ]" << std::endl;  // NOLINT
+  *stream << "       -QM   : quadratic mean                          [ sqrt((a^2+b^2) / 2) ]" << std::endl;  // NOLINT
   *stream << "       -AM   : arithmetic mean                         [ (a + b) / 2 ]" << std::endl;  // NOLINT
   *stream << "       -GM   : geometric mean                          [ sqrt(a * b) ]" << std::endl;  // NOLINT
   *stream << "       -HM   : harmonic mean                           [ 2 / (1 / a + 1 / b) ]" << std::endl;  // NOLINT
@@ -322,6 +322,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if (!sptk::SetBinaryMode()) {
+    std::ostringstream error_message;
+    error_message << "Cannot set translation mode";
+    sptk::PrintErrorMessage("vopr", error_message);
+    return 1;
+  }
+
   std::ifstream infile_ifs;
   std::ifstream file1_ifs;
 
@@ -344,12 +351,14 @@ int main(int argc, char* argv[]) {
         return 1;
       }
 
-      infile_ifs.open(infile, std::ios::in | std::ios::binary);
-      if (infile_ifs.fail() && NULL != infile) {
-        std::ostringstream error_message;
-        error_message << "Cannot open file " << infile;
-        sptk::PrintErrorMessage("vopr", error_message);
-        return 1;
+      if (NULL != infile) {
+        infile_ifs.open(infile, std::ios::in | std::ios::binary);
+        if (infile_ifs.fail()) {
+          std::ostringstream error_message;
+          error_message << "Cannot open file " << infile;
+          sptk::PrintErrorMessage("vopr", error_message);
+          return 1;
+        }
       }
 
       file1_ifs.open(file1, std::ios::in | std::ios::binary);
@@ -371,12 +380,14 @@ int main(int argc, char* argv[]) {
       }
 
       const char* infile(0 == num_input_files ? NULL : argv[optind]);
-      infile_ifs.open(infile, std::ios::in | std::ios::binary);
-      if (infile_ifs.fail() && NULL != infile) {
-        std::ostringstream error_message;
-        error_message << "Cannot open file " << infile;
-        sptk::PrintErrorMessage("vopr", error_message);
-        return 1;
+      if (NULL != infile) {
+        infile_ifs.open(infile, std::ios::in | std::ios::binary);
+        if (infile_ifs.fail()) {
+          std::ostringstream error_message;
+          error_message << "Cannot open file " << infile;
+          sptk::PrintErrorMessage("vopr", error_message);
+          return 1;
+        }
       }
       break;
     }
@@ -385,7 +396,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  std::istream& infile_stream(infile_ifs.fail() ? std::cin : infile_ifs);
+  std::istream& infile_stream(infile_ifs.is_open() ? infile_ifs : std::cin);
   std::istream& file1_stream(file1_ifs);
 
   std::vector<double> vector_a(vector_length);

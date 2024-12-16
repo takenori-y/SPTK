@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ------------------------------------------------------------------------ #
 # Copyright 2021 SPTK Working Group                                        #
 #                                                                          #
@@ -15,7 +15,6 @@
 # limitations under the License.                                           #
 # ------------------------------------------------------------------------ #
 
-import argparse
 import os
 import sys
 
@@ -26,37 +25,7 @@ import sptk.draw_utils as utils
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description="draw poles and zeros")
-    parser.add_argument(
-        metavar="outfile",
-        dest="out_file",
-        type=str,
-        help="figure",
-    )
-    parser.add_argument(
-        "-F",
-        metavar="F",
-        dest="factor",
-        default=1.0,
-        type=float,
-        help="scale of figure",
-    )
-    parser.add_argument(
-        "-W",
-        metavar="W",
-        dest="width",
-        default=None,
-        type=int,
-        help="width of figure [px]",
-    )
-    parser.add_argument(
-        "-H",
-        metavar="H",
-        dest="height",
-        default=None,
-        type=int,
-        help="height of figure [px]",
-    )
+    parser = utils.get_default_parser("draw poles and zeros", allow_dtype=False)
     parser.add_argument(
         "-g",
         dest="grid",
@@ -118,30 +87,14 @@ def get_arguments():
         metavar="mw",
         dest="marker_size",
         default=10,
-        type=int,
+        type=float,
         help="marker size",
-    )
-    parser.add_argument(
-        "-mlc",
-        metavar="mlc",
-        dest="marker_line_color",
-        default="midnightblue",
-        type=str,
-        help="marker line color",
-    )
-    parser.add_argument(
-        "-mlw",
-        metavar="mlw",
-        dest="marker_line_width",
-        default=1,
-        type=int,
-        help="marker line width",
     )
     return parser.parse_args()
 
 
 ##
-# @a gpolezero [ @e option ] [ @e infile ] @e outfile
+# @a gpolezero [ @e option ] @e outfile
 #
 # - @b -F @e float
 #   - scale of figure
@@ -149,6 +102,8 @@ def get_arguments():
 #   - width of figure in pixels
 # - @b -H @e int
 #   - height of figure in pixels
+# - @b -M @e int or str
+#   - margin around image in pixels
 # - @b -g
 #   - draw grid
 # - @b -q @e int
@@ -163,12 +118,12 @@ def get_arguments():
 #   - y-axis limits
 # - @b -mc @e str
 #   - marker color
-# - @b -mw @e int
+# - @b -mw @e float
 #   - marker size
-# - @b -mlc @e str
-#   - marker line color
-# - @b -mlw @e int
-#   - marker line width
+# - @b -ff @e str
+#   - font family
+# - @b -fs @e int
+#   - font size
 # - @b infile @e str
 #   - double-type roots
 # - @b outfile @e str
@@ -186,13 +141,10 @@ def get_arguments():
 def main():
     args = get_arguments()
 
-    in_files = []
-    if args.zero_file is not None:
-        in_files.append(args.zero_file)
-    if args.pole_file is not None:
-        in_files.append(args.pole_file)
-    if 0 == len(in_files):
-        in_files.append(None)
+    if args.zero_file is None and args.pole_file is None:
+        in_files = [None]
+    else:
+        in_files = [args.zero_file, args.pole_file]
 
     markers = (
         dict(
@@ -203,17 +155,17 @@ def main():
             line_width=0,
         ),
         dict(
-            symbol="x-thin",
+            symbol="x-open",
             color=args.marker_color,
             size=args.marker_size,
-            line_color=args.marker_line_color,
-            line_width=args.marker_line_width,
+            line_color=None,
+            line_width=0,
         ),
     )
 
     fig = go.Figure()
 
-    # Draw unit circle.
+    # Draw a unit circle.
     fig.add_shape(
         type="circle",
         xref="x",
@@ -224,11 +176,14 @@ def main():
         y1=1,
         line_color="purple",
     )
+
     # Draw zeros and poles.
     for in_file, marker in zip(in_files, markers):
-        if in_file is None:
+        if len(in_files) == 1:
             data = utils.read_stdin(dim=2)
         else:
+            if in_file is None:
+                continue
             if not os.path.exists(in_file):
                 utils.print_error_message("gpolezero", f"Cannot open {in_file}")
                 sys.exit(1)
@@ -254,19 +209,27 @@ def main():
                 marker=marker,
             )
         )
+
     fig.update_layout(
         xaxis=dict(
+            title_text="Real part",
             range=args.xlim,
             showgrid=args.grid,
             zeroline=True,
         ),
         yaxis=dict(
+            title_text="Imaginary part",
             range=args.ylim,
             showgrid=args.grid,
             zeroline=True,
             scaleanchor="x",
             scaleratio=1,
         ),
+        font=dict(
+            family=args.font_family,
+            size=args.font_size,
+        ),
+        margin=args.margin,
         showlegend=False,
     )
     fig.write_image(

@@ -14,14 +14,13 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <cfloat>    // DBL_MAX
 #include <fstream>   // std::ifstream
 #include <iomanip>   // std::setw
 #include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/analysis/mel_frequency_cepstral_coefficients_analysis.h"
 #include "SPTK/conversion/spectrum_to_spectrum.h"
 #include "SPTK/conversion/waveform_to_spectrum.h"
@@ -111,9 +110,9 @@ void PrintUsage(std::ostream* stream) {
  *   - liftering parameter @f$(1 \le L)@f$
  * - @b -s @e double
  *   - sampling rate in kHz @f$(0 < F_s)@f$
- * - @b -L @e dobule
- *   - lowest frequency in Hz @f$(0.0 \le F_l < F_h)@f$
- * - @b -H @e dobule
+ * - @b -L @e double
+ *   - lowest frequency in Hz @f$(0 \le F_l < F_h)@f$
+ * - @b -H @e double
  *   - highest frequency in Hz @f$(F_l < F_h \le 500F_s)@f$
  * - @b -q @e int
  *   - input format
@@ -142,7 +141,7 @@ void PrintUsage(std::ostream* stream) {
  *
  * @code{.sh}
  *   x2x +sd data.short |
- *     frame -l 400 -p 160 -n |
+ *     frame -l 400 -p 160 -n 1 |
  *     dfs -b 1 -0.97 |
  *     window -l 400 -L 512 -w 1 -n 0 |
  *     mfcc -l 512 -n 40 -c 22 -m 12 -L 64 -H 4000 -o 1 |
@@ -159,6 +158,7 @@ void PrintUsage(std::ostream* stream) {
  *   TARGETRATE   = 100000.0
  *   WINDOWSIZE   = 250000.0
  *   USEHAMMING   = T
+ *   USEPOWER     = F
  *   RAWENERGY    = F
  *   ENORMALIZE   = F
  *   PREEMCOEF    = 0.97
@@ -411,21 +411,29 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("mfcc", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("mfcc", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::SpectrumToSpectrum spectrum_to_spectrum(
       fft_length,
       static_cast<sptk::SpectrumToSpectrum::InputOutputFormats>(input_format),
-      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum, 0.0,
-      -DBL_MAX);
+      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum);
   if (kWaveform != input_format && !spectrum_to_spectrum.IsValid()) {
     std::ostringstream error_message;
     error_message << "Failed to set condition for input formatting";
@@ -435,8 +443,7 @@ int main(int argc, char* argv[]) {
 
   sptk::WaveformToSpectrum waveform_to_spectrum(
       fft_length, fft_length,
-      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum, 0.0,
-      -DBL_MAX);
+      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum);
   sptk::WaveformToSpectrum::Buffer buffer_for_spectral_analysis;
   if (kWaveform == input_format && !waveform_to_spectrum.IsValid()) {
     std::ostringstream error_message;
@@ -463,7 +470,7 @@ int main(int argc, char* argv[]) {
   std::vector<double> input(input_length);
   std::vector<double> processed_input(fft_length / 2 + 1);
   std::vector<double> output(output_length);
-  double energy;
+  double energy(0.0);
 
   while (sptk::ReadStream(false, 0, 0, input_length, &input, &input_stream,
                           NULL)) {
@@ -491,14 +498,14 @@ int main(int argc, char* argv[]) {
                           : NULL,
                       &buffer_for_mfcc_analysis)) {
       std::ostringstream error_message;
-      error_message << "Failed to run mfcc analysis";
+      error_message << "Failed to run MFCC analysis";
       sptk::PrintErrorMessage("mfcc", error_message);
       return 1;
     }
 
     if (!sptk::WriteStream(1, output_length, output, &std::cout, NULL)) {
       std::ostringstream error_message;
-      error_message << "Failed to write filter-bank output";
+      error_message << "Failed to write MFCC";
       sptk::PrintErrorMessage("mfcc", error_message);
       return 1;
     }

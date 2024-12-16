@@ -20,7 +20,7 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/conversion/cepstrum_to_minimum_phase_impulse_response.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -39,7 +39,7 @@ void PrintUsage(std::ostream* stream) {
   *stream << "  options:" << std::endl;
   *stream << "       -m m  : order of cepstrum                        (   int)[" << std::setw(5) << std::right << kDefaultNumInputOrder      << "][ 0 <= m <=   ]" << std::endl;  // NOLINT
   *stream << "       -M M  : order of minimum phase impulse response  (   int)[" << std::setw(5) << std::right << kDefaultNumOutputOrder     << "][ 0 <= M <=   ]" << std::endl;  // NOLINT
-  *stream << "       -l l  : length of minimum phase impulse response (   int)[" << std::setw(5) << std::right << kDefaultNumOutputOrder + 1 << "][ 0 <  l <=   ]" << std::endl;  // NOLINT
+  *stream << "       -l l  : length of minimum phase impulse response (   int)[" << std::setw(5) << std::right << kDefaultNumOutputOrder + 1 << "][ 1 <= l <=   ]" << std::endl;  // NOLINT
   *stream << "       -h    : print this message" << std::endl;
   *stream << "  infile:" << std::endl;
   *stream << "       cepstrum                                         (double)[stdin]" << std::endl;  // NOLINT
@@ -60,6 +60,8 @@ void PrintUsage(std::ostream* stream) {
  *   - order of cesptral coefficients @f$(0 \le M_1)@f$
  * - @b -M @e int
  *   - order of impulse response @f$(0 \le M_2)@f$
+ * - @b -l @e int
+ *   - length of impulse response @f$(1 \le M_2 + 1)@f$
  * - @b infile @e str
  *   - double-type cepstral coefficients
  * - @b stdout
@@ -132,15 +134,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("c2mpir", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("c2mpir", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::CepstrumToMinimumPhaseImpulseResponse
       cepstrum_to_minimum_phase_impulse_response(num_input_order,

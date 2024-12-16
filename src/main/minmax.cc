@@ -20,7 +20,7 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/math/minmax_accumulation.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -42,7 +42,8 @@ enum WaysToFindValue {
 const int kDefaultNumOrder(0);
 const int kDefaultNumBest(1);
 const OutputFormats kDefaultOutputFormat(kMinimumAndMaximum);
-const WaysToFindValue kDefaultWayToFindValue(kFindValueFromVector);
+const WaysToFindValue kDefaultWayToFindValue(
+    kFindValueFromVectorSequenceForEachDimension);
 
 void PrintUsage(std::ostream* stream) {
   // clang-format off
@@ -86,10 +87,10 @@ bool WriteMinMaxValues(
   if (kMinimumAndMaximum == output_format || kMinimum == output_format) {
     for (int rank(1); rank <= num_best; ++rank) {
       for (int vector_index(0); vector_index < vector_length; ++vector_index) {
-        int position;
         double value;
-        if (!minmax_accumulation.GetMinimum(buffer[vector_index], rank,
-                                            &position, &value)) {
+        int position;
+        if (!minmax_accumulation.GetMinimum(rank, buffer[vector_index], &value,
+                                            &position)) {
           return false;
         }
         if (NULL != stream_for_position &&
@@ -106,10 +107,10 @@ bool WriteMinMaxValues(
   if (kMinimumAndMaximum == output_format || kMaximum == output_format) {
     for (int rank(1); rank <= num_best; ++rank) {
       for (int vector_index(0); vector_index < vector_length; ++vector_index) {
-        int position;
         double value;
-        if (!minmax_accumulation.GetMaximum(buffer[vector_index], rank,
-                                            &position, &value)) {
+        int position;
+        if (!minmax_accumulation.GetMaximum(rank, buffer[vector_index], &value,
+                                            &position)) {
           return false;
         }
         if (NULL != stream_for_position &&
@@ -258,7 +259,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (kFindValueFromVector == way_to_find_value &&
-      (0 == num_order || num_order < num_best - 1)) {
+      (0 == num_order || num_order + 1 < num_best)) {
     std::ostringstream error_message;
     error_message << "Length of vector must be greater than max(1, b - 1)";
     sptk::PrintErrorMessage("minmax", error_message);
@@ -274,15 +275,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("minmax", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("minmax", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   std::ofstream ofs;
   if (NULL != position_file) {
@@ -294,9 +304,7 @@ int main(int argc, char* argv[]) {
       return 1;
     }
   }
-  std::ostream& output_stream(ofs);
-  std::ostream* output_stream_pointer(NULL == position_file ? NULL
-                                                            : &output_stream);
+  std::ostream* output_stream_pointer(NULL == position_file ? NULL : &ofs);
 
   sptk::MinMaxAccumulation minmax_accumulation(num_best);
   std::vector<sptk::MinMaxAccumulation::Buffer> buffer(
@@ -333,6 +341,7 @@ int main(int argc, char* argv[]) {
     }
   } else if (kFindValueFromVectorSequenceForEachDimension ==
              way_to_find_value) {
+    bool empty(true);
     while (sptk::ReadStream(false, 0, 0, vector_length, &data, &input_stream,
                             NULL)) {
       for (int vector_index(0); vector_index < vector_length; ++vector_index) {
@@ -344,13 +353,17 @@ int main(int argc, char* argv[]) {
           return 1;
         }
       }
+      empty = false;
     }
-    if (!WriteMinMaxValues(minmax_accumulation, buffer, num_best, output_format,
-                           output_stream_pointer)) {
-      std::ostringstream error_message;
-      error_message << "Failed to write values";
-      sptk::PrintErrorMessage("minmax", error_message);
-      return 1;
+    // Write value if at least one data is given.
+    if (!empty) {
+      if (!WriteMinMaxValues(minmax_accumulation, buffer, num_best,
+                             output_format, output_stream_pointer)) {
+        std::ostringstream error_message;
+        error_message << "Failed to write values";
+        sptk::PrintErrorMessage("minmax", error_message);
+        return 1;
+      }
     }
   }
 

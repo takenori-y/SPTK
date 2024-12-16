@@ -17,8 +17,14 @@
 #include "SPTK/generation/recursive_maximum_likelihood_parameter_generation.h"
 
 #include <algorithm>  // std::fill, std::max
-#include <cfloat>     // DBL_MAX
 #include <cstddef>    // std::size_t
+#include <vector>     // std::vector
+
+namespace {
+
+static const double kInf(sptk::kMax);
+
+}  // namespace
 
 namespace sptk {
 
@@ -74,13 +80,10 @@ RecursiveMaximumLikelihoodParameterGeneration::
       // Initialize with infinite variance.
       std::fill(buffer_.static_and_dynamic_parameters.begin() +
                     static_and_dynamic_size,
-                buffer_.static_and_dynamic_parameters.end(), DBL_MAX);
+                buffer_.static_and_dynamic_parameters.end(), kInf);
       --num_remaining_frame_;
     }
-    if (!Forward()) {
-      is_valid_ = false;
-      return;
-    }
+    Forward();
   }
 }
 
@@ -98,19 +101,18 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Get(
         buffer_.static_and_dynamic_parameters.begin(),
         buffer_.static_and_dynamic_parameters.begin() + static_and_dynamic_size,
         0.0);
-    // Unobserved variance is inifinite.
+    // Unobserved variance is infinite.
     std::fill(
         buffer_.static_and_dynamic_parameters.begin() + static_and_dynamic_size,
-        buffer_.static_and_dynamic_parameters.end(), DBL_MAX);
-    if (--num_remaining_frame_ <= 0) {
+        buffer_.static_and_dynamic_parameters.end(), kInf);
+    if (num_remaining_frame_ <= 1) {
       return false;
     }
+    --num_remaining_frame_;
   }
-  if (!Forward()) {
-    return false;
-  }
+  Forward();
 
-  const int static_size(num_order_ + 1);
+  const int static_size(GetSize());
   if (smoothed_static_parameters->size() !=
       static_cast<std::size_t>(static_size)) {
     smoothed_static_parameters->resize(static_size);
@@ -125,7 +127,7 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Get(
   return true;
 }
 
-bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
+void RecursiveMaximumLikelihoodParameterGeneration::Forward() {
   const int num_delta(static_cast<int>(window_coefficients_.size()));
   const int static_size(num_order_ + 1);
   const int dynamic_size(static_size * num_delta);
@@ -170,7 +172,7 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
         for (int u(0); u < calculation_field_; ++u) {
           buffer_.p[m][u].resize(2 * calculation_field_ + 1);
           std::fill(buffer_.p[m][u].begin(), buffer_.p[m][u].end(), 0.0);
-          buffer_.p[m][u][calculation_field_] = DBL_MAX;
+          buffer_.p[m][u][calculation_field_] = kInf;
         }
       }
     }
@@ -224,8 +226,8 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
     bool update(true);
     for (int m(0); m < static_size; ++m) {
       for (int j(-half_window_width); j <= half_window_width; ++j) {
-        if (DBL_MAX == buffer_.p[m][(current_frame_ + j) % calculation_field_]
-                                [calculation_field_]) {
+        if (kInf == buffer_.p[m][(current_frame_ + j) % calculation_field_]
+                             [calculation_field_]) {
           update = false;
           break;
         }
@@ -240,8 +242,9 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
       for (int u(-num_past_frame_); u <= max_half_window_width; ++u) {
         double tmp(0.0);
         for (int j(-half_window_width); j <= half_window_width; ++j) {
-          double* p(&buffer_.p[m][(current_frame_ + j) % calculation_field_]
-                              [calculation_field_]);
+          const double* p(
+              &buffer_.p[m][(current_frame_ + j) % calculation_field_]
+                        [calculation_field_]);
           tmp += window_coefficients[j] * p[u - j];
         }
         pi[u] = tmp;
@@ -250,7 +253,7 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
 
     // Calculate Kalman gain.
     for (int m(0); m < static_size; ++m) {
-      double* pi(&buffer_.pi[m][num_past_frame_]);
+      const double* pi(&buffer_.pi[m][num_past_frame_]);
       double tmp(0.0);
       for (int j(-half_window_width); j <= half_window_width; ++j) {
         tmp += window_coefficients[j] * pi[j];
@@ -269,8 +272,8 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
 
     // Update error covariance.
     for (int m(0); m < static_size; ++m) {
-      double* pi(&buffer_.pi[m][num_past_frame_]);
-      double* k(&buffer_.k[m][num_past_frame_]);
+      const double* pi(&buffer_.pi[m][num_past_frame_]);
+      const double* k(&buffer_.k[m][num_past_frame_]);
       for (int u(-num_past_frame_); u <= max_half_window_width; ++u) {
         double* pu(&buffer_.p[m][(current_frame_ + u) % calculation_field_]
                              [calculation_field_]);
@@ -297,7 +300,7 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
                c[(current_frame_ + j) % calculation_field_];
       }
 
-      double* k(&buffer_.k[m][num_past_frame_]);
+      const double* k(&buffer_.k[m][num_past_frame_]);
       for (int u(-num_past_frame_); u <= max_half_window_width; ++u) {
         c[(current_frame_ + u) % calculation_field_] += k[u] * tmp;
       }
@@ -305,8 +308,6 @@ bool RecursiveMaximumLikelihoodParameterGeneration::Forward() {
   }
 
   ++current_frame_;
-
-  return true;
 }
 
 }  // namespace sptk

@@ -14,14 +14,13 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <cfloat>    // DBL_MAX
 #include <fstream>   // std::ifstream
 #include <iomanip>   // std::setw
 #include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -109,8 +108,8 @@ void PrintUsage(std::ostream* stream) {
  */
 int main(int argc, char* argv[]) {
   int output_length(kDefaultOutputLength);
-  double minimum_x(-DBL_MAX);
-  double maximum_x(DBL_MAX);
+  double minimum_x(sptk::kMin);
+  double maximum_x(sptk::kMax);
 
   for (;;) {
     const int option_char(getopt_long(argc, argv, "l:m:s:e:h", NULL, NULL));
@@ -178,15 +177,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("linear_intpl", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("linear_intpl", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   // Read all data in advance.
   // This is due to estimate maximum_x if -e is not given.
@@ -213,7 +221,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (-DBL_MAX == minimum_x) {
+  if (sptk::kMin == minimum_x) {
     minimum_x = data_x.front();
   } else {
     if (minimum_x < data_x.front()) {
@@ -232,7 +240,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (DBL_MAX == maximum_x) {
+  if (sptk::kMax == maximum_x) {
     maximum_x = data_x.back();
   } else {
     if (data_x.back() < maximum_x) {

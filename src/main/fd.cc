@@ -15,6 +15,7 @@
 // ------------------------------------------------------------------------ //
 
 #include <cctype>    // std::isprint
+#include <cstdint>   // std::uint8_t
 #include <fstream>   // std::ifstream
 #include <iomanip>   // std::setfill, std::setw
 #include <ios>       // std::dec, std::hex, std::oct
@@ -22,7 +23,7 @@
 #include <sstream>   // std::ostringstream
 #include <string>    // std::string
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -74,8 +75,8 @@ void PrintUsage(std::ostream* stream) {
  *   - start index length @f$(0 \le S)@f$
  * - @b -c @e int
  *   - number of columns @f$(1 \le N)@f$
- * - @b -o @e address format
- *   - data type
+ * - @b -o @e int
+ *   - address format
  *     \arg @c 0 none
  *     \arg @c 1 hexadecimal
  *     \arg @c 2 decimal
@@ -169,15 +170,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("fd", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("fd", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   uint8_t data;
   std::ostringstream stored_characters;

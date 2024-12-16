@@ -17,8 +17,8 @@
 #ifndef SPTK_MATH_MINMAX_ACCUMULATION_H_
 #define SPTK_MATH_MINMAX_ACCUMULATION_H_
 
-#include <list>     // std::list
-#include <utility>  // std::pair
+#include <functional>  // std::greater, std::less
+#include <map>         // std::multimap
 
 #include "SPTK/utils/sptk_utils.h"
 
@@ -48,8 +48,8 @@ class MinMaxAccumulation {
     }
 
     int position_;
-    std::list<std::pair<int, double> > minimum_;
-    std::list<std::pair<int, double> > maximum_;
+    std::multimap<double, int, std::greater<double> > minimum_;
+    std::multimap<double, int, std::less<double> > maximum_;
 
     friend class MinMaxAccumulation;
     DISALLOW_COPY_AND_ASSIGN(Buffer);
@@ -80,26 +80,26 @@ class MinMaxAccumulation {
   /**
    * Get @f$n@f$-th minimum value and its position.
    *
-   * @param[in] buffer Buffer.
    * @param[in] rank Rank @f$n@f$.
-   * @param[out] position Position of minimum value.
+   * @param[in] buffer Buffer.
    * @param[out] value Minimum value.
+   * @param[out] position Position of the minimum value.
    * @return True on success, false on failure.
    */
-  bool GetMinimum(const MinMaxAccumulation::Buffer& buffer, int rank,
-                  int* position, double* value) const;
+  bool GetMinimum(int rank, const MinMaxAccumulation::Buffer& buffer,
+                  double* value, int* position) const;
 
   /**
    * Get @f$n@f$-th maximum value and its position.
    *
-   * @param[in] buffer Buffer.
    * @param[in] rank Rank @f$n@f$.
-   * @param[out] position Position of maximum value.
+   * @param[in] buffer Buffer.
    * @param[out] value Maximum value.
+   * @param[out] position Position of the maximum value.
    * @return True on success, false on failure.
    */
-  bool GetMaximum(const MinMaxAccumulation::Buffer& buffer, int rank,
-                  int* position, double* value) const;
+  bool GetMaximum(int rank, const MinMaxAccumulation::Buffer& buffer,
+                  double* value, int* position) const;
 
   /**
    * Clear buffer.

@@ -28,14 +28,25 @@ teardown() {
 }
 
 @test "c2mpir: compatibility" {
-    $sptk3/nrand -l 20 | $sptk3/c2ir -m 9 -M 32 > $tmp/1
-    $sptk3/nrand -l 20 | $sptk4/c2mpir -m 9 -M 32 > $tmp/2
+    $sptk3/nrand -l 20 | $sptk3/c2ir -m 9 -l 32 > $tmp/1
+    $sptk3/nrand -l 20 | $sptk4/c2mpir -m 9 -l 32 > $tmp/2
+    run $sptk4/aeq $tmp/1 $tmp/2
+    [ "$status" -eq 0 ]
+
+    $sptk3/nrand -l 20 | $sptk4/mgc2mgc -g 0 -G 1 -m 9 -M 31 -U > $tmp/3
+    run $sptk4/aeq $tmp/2 $tmp/3
+    [ "$status" -eq 0 ]
+}
+
+@test "c2mpir: reversibility" {
+    $sptk3/nrand -l 20 > $tmp/1
+    $sptk4/c2mpir -m 9 -l 32 $tmp/1 | $sptk4/mpir2c -l 32 -M 9 > $tmp/2
     run $sptk4/aeq $tmp/1 $tmp/2
     [ "$status" -eq 0 ]
 }
 
 @test "c2mpir: valgrind" {
     $sptk3/nrand -l 20 > $tmp/1
-    run valgrind $sptk4/c2mpir -m 9 -M 32 $tmp/1
+    run valgrind $sptk4/c2mpir -m 9 -l 32 $tmp/1
     [ "$(echo "${lines[-1]}" | sed -r 's/.*SUMMARY: ([0-9]*) .*/\1/')" -eq 0 ]
 }

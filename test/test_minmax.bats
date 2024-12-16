@@ -28,8 +28,23 @@ teardown() {
 }
 
 @test "minmax: compatibility" {
+    $sptk3/nrand -l 20 | $sptk3/minmax -l 1 -o 0 > $tmp/1
+    $sptk3/nrand -l 20 | $sptk4/minmax -l 1 -o 0 -w 1 > $tmp/2
+    run $sptk4/aeq $tmp/1 $tmp/2
+    [ "$status" -eq 0 ]
+
     $sptk3/nrand -l 20 | $sptk3/minmax -l 10 -b 2 -o 0 > $tmp/1
     $sptk3/nrand -l 20 | $sptk4/minmax -l 10 -b 2 -o 0 -w 0 > $tmp/2
+    run $sptk4/aeq $tmp/1 $tmp/2
+    [ "$status" -eq 0 ]
+
+    $sptk3/nrand -l 20 | $sptk3/sopr -FIX | $sptk3/minmax -b 2 > $tmp/1
+    $sptk3/nrand -l 20 | $sptk3/sopr -FIX | $sptk4/minmax -b 2 > $tmp/2
+    run $sptk4/aeq $tmp/1 $tmp/2
+    [ "$status" -eq 0 ]
+
+    $sptk3/nrand -l 20 | $sptk3/minmax -b 2 -d | cut -d: -f2 | $sptk3/x2x +ai > $tmp/1
+    $sptk3/nrand -l 20 | $sptk4/minmax -b 2 -p $tmp/2 > /dev/null
     run $sptk4/aeq $tmp/1 $tmp/2
     [ "$status" -eq 0 ]
 }

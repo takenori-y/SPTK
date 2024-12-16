@@ -1,20 +1,22 @@
 //-----------------------------------------------------------------------------
 // Copyright 2012 Masanori Morise
-// Author: mmorise [at] yamanashi.ac.jp (Masanori Morise)
-// Last update: 2017/04/29
+// Author: mmorise [at] meiji.ac.jp (Masanori Morise)
+// Last update: 2021/02/15
 //-----------------------------------------------------------------------------
 #ifndef WORLD_COMMON_H_
 #define WORLD_COMMON_H_
 
-#include "world/fft_world.h"
+#if 0
+#include "world/fft.h"
 #include "world/macrodefinitions.h"
 
-#if 1
+WORLD_BEGIN_C_DECLS
+#else
+#include "world/fft_world.h"
+
 namespace sptk {
 namespace world {
 #endif
-
-WORLD_BEGIN_C_DECLS
 
 //-----------------------------------------------------------------------------
 // Structs on FFT
@@ -138,9 +140,9 @@ void InitializeMinimumPhaseAnalysis(int fft_size,
 void GetMinimumPhaseSpectrum(const MinimumPhaseAnalysis *minimum_phase);
 void DestroyMinimumPhaseAnalysis(MinimumPhaseAnalysis *minimum_phase);
 
+#if 0
 WORLD_END_C_DECLS
-
-#if 1
+#else
 }  // namespace world
 }  // namespace sptk
 #endif

@@ -1,9 +1,11 @@
 black
 breathe
 clang-format
-cpplint
-docutils>=0.14,<0.18
+cmake-format
+cpplint<2.0.0
+docstrfmt
 flake8
 isort
+mdformat
 sphinx
 sphinx-rtd-theme

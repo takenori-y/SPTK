@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ------------------------------------------------------------------------ #
 # Copyright 2021 SPTK Working Group                                        #
 #                                                                          #
@@ -15,7 +15,6 @@
 # limitations under the License.                                           #
 # ------------------------------------------------------------------------ #
 
-import argparse
 import os
 import sys
 
@@ -26,44 +25,8 @@ import sptk.draw_utils as utils
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description="draw a log spectrum graph")
-    parser.add_argument(
-        metavar="infile",
-        dest="in_file",
-        default=None,
-        nargs="?",
-        type=str,
-        help="log spectrum (double)",
-    )
-    parser.add_argument(
-        metavar="outfile",
-        dest="out_file",
-        type=str,
-        help="figure",
-    )
-    parser.add_argument(
-        "-F",
-        metavar="F",
-        dest="factor",
-        default=1.0,
-        type=float,
-        help="scale of figure",
-    )
-    parser.add_argument(
-        "-W",
-        metavar="W",
-        dest="width",
-        default=None,
-        type=int,
-        help="width of figure [px]",
-    )
-    parser.add_argument(
-        "-H",
-        metavar="H",
-        dest="height",
-        default=None,
-        type=int,
-        help="height of figure [px]",
+    parser = utils.get_default_parser(
+        "draw a log spectrum", input_name="log spectrum", allow_dtype=False
     )
     parser.add_argument(
         "-g",
@@ -124,8 +87,8 @@ def get_arguments():
         "-lw",
         metavar="lw",
         dest="line_width",
-        default=1,
-        type=int,
+        default=None,
+        type=float,
         help="line width",
     )
     return parser.parse_args()
@@ -140,6 +103,8 @@ def get_arguments():
 #   - width of figure in pixels
 # - @b -H @e int
 #   - height of figure in pixels
+# - @b -M @e int or str
+#   - margin around image in pixels
 # - @b -g
 #   - draw grid
 # - @b -s @e int
@@ -154,8 +119,12 @@ def get_arguments():
 #   - line style (solid, dash, dot, or dashdot)
 # - @b -lc @e str
 #   - line color
-# - @b -lw @e int
+# - @b -lw @e float
 #   - line width
+# - @b -ff @e str
+#   - font family
+# - @b -fs @e int
+#   - font size
 # - @b infile @e str
 #   - double-type log spectrum
 # - @b outfile @e str
@@ -217,6 +186,11 @@ def main():
             range=args.ylim,
             showgrid=args.grid,
         ),
+        font=dict(
+            family=args.font_family,
+            size=args.font_size,
+        ),
+        margin=args.margin,
     )
     fig.write_image(
         args.out_file, width=args.width, height=args.height, scale=args.factor

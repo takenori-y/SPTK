@@ -18,6 +18,7 @@
 
 #include <cmath>    // std::acos, std::ceil, std::fabs, std::floor
 #include <cstddef>  // std::size_t
+#include <vector>   // std::vector
 
 namespace {
 
@@ -51,7 +52,7 @@ LinearPredictiveCoefficientsToLineSpectralPairs::
       num_iteration_(num_iteration),
       convergence_threshold_(convergence_threshold),
       is_valid_(true) {
-  if (num_order_ < 0 || num_split_ <= 0 || num_iteration_ <= 0 ||
+  if (num_order_ < 0 || num_split_ <= 0 || num_iteration_ < 0 ||
       convergence_threshold_ < 0.0) {
     is_valid_ = false;
     return;
@@ -115,7 +116,7 @@ bool LinearPredictiveCoefficientsToLineSpectralPairs::Run(
     c2[0] *= 0.5;
   }
 
-  std::vector<double>* c(&buffer->c1_);
+  const std::vector<double>* c(&buffer->c1_);
   int order(0);
   double x_prev(1.0);
   double y_prev(CalculateChebyshevPolynomial(*c, x_prev));

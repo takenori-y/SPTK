@@ -28,17 +28,26 @@ teardown() {
 }
 
 @test "acorr: compatibility" {
+    # Time domain:
     $sptk3/nrand -l 20 | $sptk3/acorr -l 10 -m 4 > $tmp/1
     $sptk3/nrand -l 20 | $sptk4/acorr -l 10 -m 4 > $tmp/2
     run $sptk4/aeq $tmp/1 $tmp/2
     [ "$status" -eq 0 ]
+
+    # Frequency domain:
+    for o in $(seq 0 3); do
+        $sptk3/nrand -l 20 | $sptk3/spec -m 9 -l 32 -o "$o" |
+            $sptk4/acorr -l 32 -m 4 -q "$o" > $tmp/3
+        run $sptk4/aeq $tmp/1 $tmp/3
+        [ "$status" -eq 0 ]
+    done
 }
 
 @test "acorr: normalization" {
     $sptk3/nrand -l 10 | $sptk4/acorr -l 9 -m 4 > $tmp/1
     z=$($sptk3/bcut +d -s 0 -e 0 $tmp/1 | $sptk3/x2x +da)
     $sptk3/sopr -d "$z" $tmp/1 > $tmp/2
-    $sptk3/nrand -l 10 | $sptk4/acorr -l 9 -m 4 -o 2 > $tmp/3
+    $sptk3/nrand -l 10 | $sptk4/acorr -l 9 -m 4 -o 1 > $tmp/3
     run $sptk4/aeq $tmp/2 $tmp/3
     [ "$status" -eq 0 ]
 }

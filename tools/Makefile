@@ -14,43 +14,46 @@
 # limitations under the License.                                           #
 # ------------------------------------------------------------------------ #
 
-SHELLCHECK_VERSION := 0.8.0
+PYTHON_VERSION     := 3.9
+BATS_VERSION       := 1.11.0
+CPPCHECK_VERSION   := 2.16.0
+DOXYGEN_VERSION    := 1.9.1
+SHELLCHECK_VERSION := 0.10.0
+SHFMT_VERSION      := 3.10.0
 JOBS               := 4
 
 
 all: check doxygen.done
 
-check: venv_dev bats.done shellcheck.done sptk.done
+check: venv_dev bats.done cppcheck.done shellcheck.done shfmt.done sptk.done
 
 venv:
-	@if type virtualenv > /dev/null 2>&1; then \
-		test -d venv || virtualenv -p python3 venv; \
-	else \
-		test -d venv || python3 -m venv venv; \
-	fi
-	. venv/bin/activate; pip install pip --upgrade; \
-	 pip install -r requirements.txt --upgrade
+	test -d venv || python$(PYTHON_VERSION) -m venv venv
+	. ./venv/bin/activate && python -m pip install pip --upgrade
+	. ./venv/bin/activate && python -m pip install -r requirements.txt --upgrade
 	touch venv/bin/activate
 
 venv_dev:
-	@if type virtualenv > /dev/null 2>&1; then \
-		test -d venv || virtualenv -p python3 venv; \
-	else \
-		test -d venv || python3 -m venv venv; \
-	fi
-	. venv/bin/activate; pip install pip --upgrade; \
-	pip install -r requirements.txt -r test_requirements.txt --upgrade
+	test -d venv || python$(PYTHON_VERSION) -m venv venv
+	. ./venv/bin/activate && python -m pip install pip --upgrade
+	. ./venv/bin/activate && python -m pip install -r requirements.txt -r test_requirements.txt --upgrade
 	touch venv/bin/activate
 
 bats.done:
 	rm -rf bats
-	git clone https://github.com/bats-core/bats-core.git bats --depth 1
+	git clone https://github.com/bats-core/bats-core.git bats -b v$(BATS_VERSION) --single-branch --depth 1
 	touch bats.done
+
+cppcheck.done:
+	rm -rf cppcheck
+	git clone https://github.com/danmar/cppcheck.git -b $(CPPCHECK_VERSION) --single-branch --depth 1
+	cd cppcheck && make -j $(JOBS) MATCHCOMPILER=yes HAVE_RULES=yes CXXFLAGS="-O2 -DNDEBUG -Wall -Wno-sign-compare -Wno-unused-function -Wno-multichar"
+	touch cppcheck.done
 
 doxygen.done:
 	rm -rf doxygen
-	git clone https://github.com/doxygen/doxygen.git -b Release_1_9_1 --depth 1
-	cd doxygen; mkdir -p build; cd build; cmake -G "Unix Makefiles" ..; make
+	git clone https://github.com/doxygen/doxygen.git -b Release_$(subst .,_, $(DOXYGEN_VERSION)) --single-branch --depth 1
+	cd doxygen && mkdir -p build && cd build && cmake -G "Unix Makefiles" .. && make -j $(JOBS)
 	touch doxygen.done
 
 shellcheck.done:
@@ -61,14 +64,21 @@ shellcheck.done:
 	mv shellcheck-v$(SHELLCHECK_VERSION) shellcheck
 	touch shellcheck.done
 
+shfmt.done:
+	rm -rf shfmt
+	mkdir shfmt
+	wget -O shfmt/shfmt https://github.com/mvdan/sh/releases/download/v$(SHFMT_VERSION)/shfmt_v$(SHFMT_VERSION)_linux_amd64
+	chmod 755 shfmt/shfmt
+	touch shfmt.done
+
 sptk.done:
 	rm -rf sptk
-	export GIT_SSL_NO_VERIFY=1; git clone https://git.code.sf.net/p/sp-tk/SPTK sptk
-	cd sptk/src; aclocal; automake -a -c; autoconf; \
-	./configure --enable-double --prefix=$(CURDIR)/sptk; make -j $(JOBS); make install
+	export GIT_SSL_NO_VERIFY=1 && git clone https://git.code.sf.net/p/sp-tk/SPTK sptk
+	cd sptk/src && aclocal && automake -a -c && autoconf
+	cd sptk/src && ./configure --enable-double --prefix=$(CURDIR)/sptk && make -j $(JOBS) && make install
 	touch sptk.done
 
 clean:
-	rm -rf venv bats doxygen shellcheck sptk *.done
+	rm -rf venv bats cppcheck doxygen shellcheck shfmt sptk *.done
 
 .PHONY: all check venv venv_dev clean

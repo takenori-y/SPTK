@@ -22,7 +22,7 @@
 #include <sstream>    // std::ostringstream
 #include <vector>     // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/conversion/linear_predictive_coefficients_to_line_spectral_pairs.h"
 #include "SPTK/utils/sptk_utils.h"
 
@@ -44,7 +44,7 @@ enum OutputFormats {
 };
 
 const int kDefaultNumOrder(25);
-const double kDefaultSamplingFrequency(10.0);
+const double kDefaultSamplingRate(10.0);
 const OutputGainType kDefaultOutputGainType(kLinearGain);
 const OutputFormats kDefaultOutputFormat(kFrequencyInRadians);
 const int kDefaultNumSplit(256);
@@ -60,7 +60,7 @@ void PrintUsage(std::ostream* stream) {
   *stream << "       lpc2lsp [ options ] [ infile ] > stdout" << std::endl;
   *stream << "  options:" << std::endl;
   *stream << "       -m m  : order of linear predictive coefficients (   int)[" << std::setw(5) << std::right << kDefaultNumOrder             << "][   0 <= m <=   ]" << std::endl;  // NOLINT
-  *stream << "       -s s  : sampling frequency                      (double)[" << std::setw(5) << std::right << kDefaultSamplingFrequency    << "][ 0.0 <  s <=   ]" << std::endl;  // NOLINT
+  *stream << "       -s s  : sampling rate                           (double)[" << std::setw(5) << std::right << kDefaultSamplingRate         << "][ 0.0 <  s <=   ]" << std::endl;  // NOLINT
   *stream << "       -k k  : output gain type                        (   int)[" << std::setw(5) << std::right << kDefaultOutputGainType       << "][   0 <= k <= 2 ]" << std::endl;  // NOLINT
   *stream << "                 0 (linear gain)" << std::endl;
   *stream << "                 1 (log gain)" << std::endl;
@@ -73,7 +73,7 @@ void PrintUsage(std::ostream* stream) {
   *stream << "       -h    : print this message" << std::endl;
   *stream << "     (level 2)" << std::endl;
   *stream << "       -n n  : number of splits of unit circle         (   int)[" << std::setw(5) << std::right << kDefaultNumSplit             << "][   1 <= n <=   ]" << std::endl;  // NOLINT
-  *stream << "       -i i  : maximum number of iterations            (   int)[" << std::setw(5) << std::right << kDefaultNumIteration         << "][   1 <= i <=   ]" << std::endl;  // NOLINT
+  *stream << "       -i i  : maximum number of iterations            (   int)[" << std::setw(5) << std::right << kDefaultNumIteration         << "][   0 <= i <=   ]" << std::endl;  // NOLINT
   *stream << "       -d d  : convergence threshold                   (double)[" << std::setw(5) << std::right << kDefaultConvergenceThreshold << "][ 0.0 <= d <=   ]" << std::endl;  // NOLINT
   *stream << "  infile:" << std::endl;
   *stream << "       linear predictive coefficients                  (double)[stdin]" << std::endl;  // NOLINT
@@ -106,9 +106,9 @@ void PrintUsage(std::ostream* stream) {
  *     \arg @c 2 frequency in kHz
  *     \arg @c 3 frequency in Hz
  * - @b -n @e int
- *   - number of splits of unit circle @f$(1 \le S)@f$
+ *   - number of splits of unit circle quadrant @f$(1 \le S)@f$
  * - @b -i @e int
- *   - maximum number of iterations @f$(1 \le N)@f$
+ *   - maximum number of iterations @f$(0 \le N)@f$
  * - @b -d @e double
  *   - convergence threshold @f$(0 \le \epsilon)@f$
  * - @b infile @e str
@@ -128,7 +128,7 @@ void PrintUsage(std::ostream* stream) {
  */
 int main(int argc, char* argv[]) {
   int num_order(kDefaultNumOrder);
-  double sampling_frequency(kDefaultSamplingFrequency);
+  double sampling_rate(kDefaultSamplingRate);
   OutputGainType output_gain_type(kDefaultOutputGainType);
   OutputFormats output_format(kDefaultOutputFormat);
   int num_split(kDefaultNumSplit);
@@ -153,8 +153,8 @@ int main(int argc, char* argv[]) {
         break;
       }
       case 's': {
-        if (!sptk::ConvertStringToDouble(optarg, &sampling_frequency) ||
-            sampling_frequency <= 0.0) {
+        if (!sptk::ConvertStringToDouble(optarg, &sampling_rate) ||
+            sampling_rate <= 0.0) {
           std::ostringstream error_message;
           error_message
               << "The argument for the -s option must be a positive number";
@@ -206,10 +206,10 @@ int main(int argc, char* argv[]) {
       }
       case 'i': {
         if (!sptk::ConvertStringToInteger(optarg, &num_iteration) ||
-            num_iteration <= 0) {
+            num_iteration < 0) {
           std::ostringstream error_message;
-          error_message
-              << "The argument for the -i option must be a positive integer";
+          error_message << "The argument for the -i option must be a "
+                        << "non-negative integer";
           sptk::PrintErrorMessage("lpc2lsp", error_message);
           return 1;
         }
@@ -246,15 +246,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("lpc2lsp", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("lpc2lsp", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::LinearPredictiveCoefficientsToLineSpectralPairs
       linear_predictive_coefficients_to_line_spectral_pairs(
@@ -296,17 +305,15 @@ int main(int argc, char* argv[]) {
         break;
       }
       case kFrequecnyInkHz: {
-        std::transform(
-            coefficients.begin() + 1, coefficients.end(),
-            coefficients.begin() + 1,
-            [sampling_frequency](double w) { return w * sampling_frequency; });
+        std::transform(coefficients.begin() + 1, coefficients.end(),
+                       coefficients.begin() + 1,
+                       [sampling_rate](double w) { return w * sampling_rate; });
         break;
       }
       case kFrequecnyInHz: {
         std::transform(coefficients.begin() + 1, coefficients.end(),
-                       coefficients.begin() + 1,
-                       [sampling_frequency](double w) {
-                         return w * 1000.0 * sampling_frequency;
+                       coefficients.begin() + 1, [sampling_rate](double w) {
+                         return w * 1000.0 * sampling_rate;
                        });
         break;
       }

@@ -17,13 +17,14 @@
 #include "SPTK/conversion/waveform_to_autocorrelation.h"
 
 #include <cstddef>  // std::size_t
+#include <vector>   // std::vector
 
 namespace sptk {
 
 WaveformToAutocorrelation::WaveformToAutocorrelation(int frame_length,
                                                      int num_order)
     : frame_length_(frame_length), num_order_(num_order), is_valid_(true) {
-  if (frame_length <= 0 || num_order_ < 0) {
+  if (frame_length_ <= 0 || num_order_ < 0 || frame_length_ <= num_order_) {
     is_valid_ = false;
     return;
   }

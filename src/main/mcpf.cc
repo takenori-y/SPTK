@@ -20,14 +20,14 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
-#include "SPTK/utils/mel_cepstrum_postfiltering.h"
+#include "GETOPT/ya_getopt.h"
+#include "SPTK/postfilter/mel_cepstrum_postfilter.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
 
 const int kDefaultNumOrder(25);
-const int kDefaultImpulseResponseLength(1024);
+const int kDefaultImpulseResponseLength(128);
 const int kDefaultOnsetIndex(2);
 const double kDefaultAlpha(0.35);
 const double kDefaultBeta(0.1);
@@ -40,7 +40,7 @@ void PrintUsage(std::ostream* stream) {
   *stream << "  usage:" << std::endl;
   *stream << "       mcpf [ options ] [ infile ] > stdout" << std::endl;
   *stream << "  options:" << std::endl;
-  *stream << "       -m m  : order of mel-cepstrum      (   int)[" << std::setw(5) << std::right << kDefaultNumOrder              << "][    0 <= m <  l   ]" << std::endl;  // NOLINT
+  *stream << "       -m m  : order of mel-cepstrum      (   int)[" << std::setw(5) << std::right << kDefaultNumOrder              << "][    0 <= m <      ]" << std::endl;  // NOLINT
   *stream << "       -l l  : length of impulse response (   int)[" << std::setw(5) << std::right << kDefaultImpulseResponseLength << "][    2 <= l <=     ]" << std::endl;  // NOLINT
   *stream << "       -s s  : onset index                (   int)[" << std::setw(5) << std::right << kDefaultOnsetIndex            << "][    0 <= s <= m   ]" << std::endl;  // NOLINT
   *stream << "       -a a  : all-pass constant          (double)[" << std::setw(5) << std::right << kDefaultAlpha                 << "][ -1.0 <  a <  1.0 ]" << std::endl;  // NOLINT
@@ -64,9 +64,9 @@ void PrintUsage(std::ostream* stream) {
  * @a mcpf [ @e option ] [ @e infile ]
  *
  * - @b -m @e int
- *   - order of mel-cepstral coefficients @f$(0 \le M < L)@f$
+ *   - order of mel-cepstral coefficients @f$(0 \le M)@f$
  * - @b -l @e int
- *   - length of impulse response @f$(M < L)@f$
+ *   - length of impulse response @f$(2 \le L)@f$
  * - @b -s @e int
  *   - onset index @f$(0 \le S \le M)@f$
  * - @b -a @e double
@@ -106,9 +106,11 @@ int main(int argc, char* argv[]) {
         break;
       }
       case 'l': {
-        if (!sptk::ConvertStringToInteger(optarg, &impulse_response_length)) {
+        if (!sptk::ConvertStringToInteger(optarg, &impulse_response_length) ||
+            impulse_response_length <= 0) {
           std::ostringstream error_message;
-          error_message << "The argument for the -l option must be an integer";
+          error_message
+              << "The argument for the -l option must be a positive integer";
           sptk::PrintErrorMessage("mcpf", error_message);
           return 1;
         }
@@ -156,14 +158,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (impulse_response_length <= num_order) {
-    std::ostringstream error_message;
-    error_message
-        << "Order of mel-cepstrum must be less than length of impulse response";
-    sptk::PrintErrorMessage("mcpf", error_message);
-    return 1;
-  }
-
   if (num_order < onset_index) {
     std::ostringstream error_message;
     error_message << "Order of mel-cepstrum must be greater than onset index";
@@ -180,20 +174,29 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("mcpf", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
 
-  sptk::MelCepstrumPostfiltering mel_cepstrum_postfiltering(
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("mcpf", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
+
+  sptk::MelCepstrumPostfilter mel_cepstrum_postfilter(
       num_order, impulse_response_length, onset_index, alpha, beta);
-  sptk::MelCepstrumPostfiltering::Buffer buffer;
-  if (!mel_cepstrum_postfiltering.IsValid()) {
+  sptk::MelCepstrumPostfilter::Buffer buffer;
+  if (!mel_cepstrum_postfilter.IsValid()) {
     std::ostringstream error_message;
     error_message << "FFT length must be a power of 2 and greater than 1";
     sptk::PrintErrorMessage("mcpf", error_message);
@@ -205,7 +208,7 @@ int main(int argc, char* argv[]) {
 
   while (sptk::ReadStream(false, 0, 0, length, &mel_cepstrum, &input_stream,
                           NULL)) {
-    if (!mel_cepstrum_postfiltering.Run(&mel_cepstrum, &buffer)) {
+    if (!mel_cepstrum_postfilter.Run(&mel_cepstrum, &buffer)) {
       std::ostringstream error_message;
       error_message << "Failed to apply postfilter for mel-cepstrum";
       sptk::PrintErrorMessage("mcpf", error_message);

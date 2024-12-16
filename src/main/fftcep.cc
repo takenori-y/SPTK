@@ -14,14 +14,13 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <cfloat>    // DBL_MAX
 #include <fstream>   // std::ifstream
 #include <iomanip>   // std::setw
 #include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/analysis/fast_fourier_transform_cepstral_analysis.h"
 #include "SPTK/conversion/spectrum_to_spectrum.h"
 #include "SPTK/conversion/waveform_to_spectrum.h"
@@ -126,7 +125,7 @@ int main(int argc, char* argv[]) {
   double acceleration_factor(kDefaultAccelerationFactor);
   InputFormats input_format(kDefaultInputFormat);
   double epsilon(0.0);
-  double relative_floor_in_decibels(-DBL_MAX);
+  double relative_floor_in_decibels(sptk::kMin);
 
   for (;;) {
     const int option_char(
@@ -242,15 +241,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("fftcep", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("fftcep", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::SpectrumToSpectrum spectrum_to_spectrum(
       fft_length,
@@ -259,7 +267,7 @@ int main(int argc, char* argv[]) {
       relative_floor_in_decibels);
   if (kWaveform != input_format && !spectrum_to_spectrum.IsValid()) {
     std::ostringstream error_message;
-    error_message << "Failed to set condition for input formatting";
+    error_message << "Failed to initialize SpectrumToSpectrum";
     sptk::PrintErrorMessage("fftcep", error_message);
     return 1;
   }
@@ -297,18 +305,18 @@ int main(int argc, char* argv[]) {
 
   while (sptk::ReadStream(false, 0, 0, input_length, &input, &input_stream,
                           NULL)) {
-    if (kWaveform != input_format) {
-      if (!spectrum_to_spectrum.Run(input, &processed_input)) {
-        std::ostringstream error_message;
-        error_message << "Failed to convert spectrum";
-        sptk::PrintErrorMessage("fftcep", error_message);
-        return 1;
-      }
-    } else {
+    if (kWaveform == input_format) {
       if (!waveform_to_spectrum.Run(input, &processed_input,
                                     &buffer_for_spectral_analysis)) {
         std::ostringstream error_message;
         error_message << "Failed to transform waveform to spectrum";
+        sptk::PrintErrorMessage("fftcep", error_message);
+        return 1;
+      }
+    } else {
+      if (!spectrum_to_spectrum.Run(input, &processed_input)) {
+        std::ostringstream error_message;
+        error_message << "Failed to convert spectrum";
         sptk::PrintErrorMessage("fftcep", error_message);
         return 1;
       }

@@ -20,7 +20,7 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/filter/line_spectral_pairs_digital_filter.h"
 #include "SPTK/input/input_source_from_stream.h"
 #include "SPTK/input/input_source_interpolation.h"
@@ -29,12 +29,17 @@
 
 namespace {
 
+enum LocalGainType {
+  kLinear = 0,
+  kLog,
+  kUnity,
+  kNumGainTypes,
+};
+
 const int kDefaultNumFilterOrder(25);
 const int kDefaultFramePeriod(100);
 const int kDefaultInterpolationPeriod(1);
-const sptk::InputSourcePreprocessingForFilterGain::FilterGainType
-    kDefaultGainType(
-        sptk::InputSourcePreprocessingForFilterGain::FilterGainType::kLinear);
+const LocalGainType kDefaultGainType(kLinear);
 
 void PrintUsage(std::ostream* stream) {
   // clang-format off
@@ -90,8 +95,8 @@ void PrintUsage(std::ostream* stream) {
  * - @b stdout
  *   - double-type output sequence
  *
- * In the below example, an exciation signal generated from pitch information is
- * passed through the synthesis filter built from LSP coefficients.
+ * In the below example, an excitation signal generated from pitch information
+ * is passed through the synthesis filter built from LSP coefficients.
  *
  * @code{.sh}
  *   excite < data.pitch | lspdf data.lsp > data.syn
@@ -105,8 +110,7 @@ int main(int argc, char* argv[]) {
   int num_filter_order(kDefaultNumFilterOrder);
   int frame_period(kDefaultFramePeriod);
   int interpolation_period(kDefaultInterpolationPeriod);
-  sptk::InputSourcePreprocessingForFilterGain::FilterGainType gain_type(
-      kDefaultGainType);
+  LocalGainType local_gain_type(kDefaultGainType);
 
   for (;;) {
     const int option_char(getopt_long(argc, argv, "m:p:i:k:h", NULL, NULL));
@@ -148,8 +152,7 @@ int main(int argc, char* argv[]) {
       }
       case 'k': {
         const int min(0);
-        const int max(static_cast<int>(
-            sptk::InputSourcePreprocessingForFilterGain::kUnity));
+        const int max(static_cast<int>(kNumGainTypes) - 1);
         int tmp;
         if (!sptk::ConvertStringToInteger(optarg, &tmp) ||
             !sptk::IsInRange(tmp, min, max)) {
@@ -159,8 +162,7 @@ int main(int argc, char* argv[]) {
           sptk::PrintErrorMessage("lspdf", error_message);
           return 1;
         }
-        gain_type = static_cast<
-            sptk::InputSourcePreprocessingForFilterGain::FilterGainType>(tmp);
+        local_gain_type = static_cast<LocalGainType>(tmp);
         break;
       }
       case 'h': {
@@ -199,6 +201,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  if (!sptk::SetBinaryMode()) {
+    std::ostringstream error_message;
+    error_message << "Cannot set translation mode";
+    sptk::PrintErrorMessage("lspdf", error_message);
+    return 1;
+  }
+
   // Open stream for reading filter coefficients.
   std::ifstream ifs1;
   ifs1.open(filter_coefficients_file, std::ios::in | std::ios::binary);
@@ -212,14 +221,35 @@ int main(int argc, char* argv[]) {
 
   // Open stream for reading input signals.
   std::ifstream ifs2;
-  ifs2.open(filter_input_file, std::ios::in | std::ios::binary);
-  if (ifs2.fail() && NULL != filter_input_file) {
-    std::ostringstream error_message;
-    error_message << "Cannot open file " << filter_input_file;
-    sptk::PrintErrorMessage("lspdf", error_message);
-    return 1;
+  if (NULL != filter_input_file) {
+    ifs2.open(filter_input_file, std::ios::in | std::ios::binary);
+    if (ifs2.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << filter_input_file;
+      sptk::PrintErrorMessage("lspdf", error_message);
+      return 1;
+    }
   }
-  std::istream& stream_for_filter_input(ifs2.fail() ? std::cin : ifs2);
+  std::istream& stream_for_filter_input(ifs2.is_open() ? ifs2 : std::cin);
+
+  sptk::InputSourcePreprocessingForFilterGain::FilterGainType gain_type;
+  switch (local_gain_type) {
+    case kLinear: {
+      gain_type = sptk::InputSourcePreprocessingForFilterGain::kLinear;
+      break;
+    }
+    case kLog: {
+      gain_type = sptk::InputSourcePreprocessingForFilterGain::kLog;
+      break;
+    }
+    case kUnity: {
+      gain_type = sptk::InputSourcePreprocessingForFilterGain::kUnity;
+      break;
+    }
+    default: {
+      return 1;
+    }
+  }
 
   // Prepare variables for filtering.
   const int filter_length(num_filter_order + 1);

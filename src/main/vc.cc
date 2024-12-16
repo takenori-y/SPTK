@@ -20,8 +20,9 @@
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/math/gaussian_mixture_model_based_conversion.h"
+#include "SPTK/utils/misc_utils.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -83,11 +84,11 @@ void PrintUsage(std::ostream* stream) {
  *   - order of target vector @f$(0 \le M_2)@f$
  * - @b -k @e int
  *   - number of mixtures @f$(1 \le K)@f$
- * - @b -f @e bool
+ * - @b -f
  *   - use full or block covariance instead of diagonal one
  * - @b -d @e double+
  *   - delta coefficients
- * - @b -D @e string
+ * - @b -D @e str
  *   - filename of double-type delta coefficients
  * - @b -r @e int+
  *   - width of 1st (and 2nd) regression coefficients
@@ -200,7 +201,8 @@ int main(int argc, char* argv[]) {
       case 'd': {
         if (is_regression_specified) {
           std::ostringstream error_message;
-          error_message << "-d and -r options cannot be specified at the same";
+          error_message
+              << "-d and -r options cannot be specified at the same time";
           sptk::PrintErrorMessage("vc", error_message);
           return 1;
         }
@@ -225,7 +227,8 @@ int main(int argc, char* argv[]) {
       case 'D': {
         if (is_regression_specified) {
           std::ostringstream error_message;
-          error_message << "-D and -r options cannot be specified at the same";
+          error_message
+              << "-D and -r options cannot be specified at the same time";
           sptk::PrintErrorMessage("vc", error_message);
           return 1;
         }
@@ -257,39 +260,29 @@ int main(int argc, char* argv[]) {
         int n;
         // Set first order coefficients.
         {
-          if (!sptk::ConvertStringToInteger(optarg, &n) || n <= 0) {
+          std::vector<double> coefficients;
+          if (!sptk::ConvertStringToInteger(optarg, &n) ||
+              !sptk::ComputeFirstOrderRegressionCoefficients(n,
+                                                             &coefficients)) {
             std::ostringstream error_message;
             error_message
                 << "The argument for the -r option must be positive integer(s)";
             sptk::PrintErrorMessage("vc", error_message);
             return 1;
-          }
-
-          std::vector<double> coefficients(2 * n + 1);
-          const int a1(n * (n + 1) * (2 * n + 1) / 3);
-          const double norm(1.0 / a1);
-          for (int j(-n), i(0); j <= n; ++j, ++i) {
-            coefficients[i] = j * norm;
           }
           window_coefficients.push_back(coefficients);
         }
 
         // Set second order coefficients.
         if (optind < argc && sptk::ConvertStringToInteger(argv[optind], &n)) {
-          if (n <= 0) {
+          std::vector<double> coefficients;
+          if (!sptk::ComputeSecondOrderRegressionCoefficients(n,
+                                                              &coefficients)) {
             std::ostringstream error_message;
             error_message
                 << "The argument for the -r option must be positive integer(s)";
             sptk::PrintErrorMessage("vc", error_message);
             return 1;
-          }
-          std::vector<double> coefficients(2 * n + 1);
-          const int a0(2 * n + 1);
-          const int a1(a0 * n * (n + 1) / 3);
-          const int a2(a1 * (3 * n * n + 3 * n - 1) / 5);
-          const double norm(2.0 / (a2 * a0 - a1 * a1));
-          for (int j(-n), i(0); j <= n; ++j, ++i) {
-            coefficients[i] = (a0 * j * j - a1) * norm;
           }
           window_coefficients.push_back(coefficients);
           ++optind;
@@ -336,6 +329,13 @@ int main(int argc, char* argv[]) {
   } else {
     std::ostringstream error_message;
     error_message << "Just two input files, gmmfile and infile, are required";
+    sptk::PrintErrorMessage("vc", error_message);
+    return 1;
+  }
+
+  if (!sptk::SetBinaryMode()) {
+    std::ostringstream error_message;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("vc", error_message);
     return 1;
   }
@@ -399,14 +399,16 @@ int main(int argc, char* argv[]) {
   std::vector<std::vector<double> > source_vectors;
   {
     std::ifstream ifs;
-    ifs.open(input_file, std::ios::in | std::ios::binary);
-    if (ifs.fail() && NULL != input_file) {
-      std::ostringstream error_message;
-      error_message << "Cannot open file " << input_file;
-      sptk::PrintErrorMessage("vc", error_message);
-      return 1;
+    if (NULL != input_file) {
+      ifs.open(input_file, std::ios::in | std::ios::binary);
+      if (ifs.fail()) {
+        std::ostringstream error_message;
+        error_message << "Cannot open file " << input_file;
+        sptk::PrintErrorMessage("vc", error_message);
+        return 1;
+      }
     }
-    std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+    std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
     const int read_size(static_cast<int>(window_coefficients.size() + 1) *
                         (num_source_order + 1));

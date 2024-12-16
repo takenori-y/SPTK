@@ -5,7 +5,9 @@ iulaw
 
 .. doxygenfile:: iulaw.cc
 
-.. seealso:: :ref:`ulaw`
+.. seealso::
+
+    :ref:`ulaw` :ref:`ialaw`
 
 .. doxygenclass:: sptk::MuLawExpansion
-   :members:
+    :members:

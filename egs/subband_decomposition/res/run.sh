@@ -21,14 +21,14 @@ sptk4=../../../bin
 data=../../../asset/data.short
 dump=dump
 
-sr=16          # Sample rate in kHz
-fl=$((sr*25))  # Frame length (16kHz x 25ms)
-fp=$((sr*5))   # Frame shift  (16kHz x 5ms)
-nfft=512       # FFT length
-order=24       # Order of mel-cepstrum
-alpha=0.42     # Alpha of mel-cepstrum
-nband=8        # Number of subbands
-fo=79          # Order of filter
+sr=16           # Sample rate in kHz
+fl=$((sr * 25)) # Frame length (16kHz x 25ms)
+fp=$((sr * 5))  # Frame shift (16kHz x 5ms)
+nfft=512        # FFT length
+order=24        # Order of mel-cepstrum
+alpha=0.42      # Alpha of mel-cepstrum
+nband=8         # Number of subbands
+fo=79           # Order of filter
 
 mkdir -p $dump
 
@@ -49,8 +49,7 @@ $sptk4/pqmf -k $nband -m $fo $dump/data.res |
 # Synthesis.
 $sptk4/interpolate -l $nband -p $nband < $dump/data.ana.res |
     $sptk4/sopr -m $nband |
-    $sptk4/ipqmf -k $nband -m $fo |
-    $sptk4/delay -s -$fo > $dump/data.syn.res
+    $sptk4/ipqmf -k $nband -m $fo > $dump/data.syn.res
 
 # Filtering.
 $sptk4/mglsadf -p $fp -m $order -a $alpha -P 7 $dump/data.mgc < $dump/data.syn.res |

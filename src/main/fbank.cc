@@ -14,14 +14,13 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <cfloat>    // DBL_MAX
 #include <fstream>   // std::ifstream
 #include <iomanip>   // std::setw
 #include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>   // std::ostringstream
 #include <vector>    // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/analysis/mel_filter_bank_analysis.h"
 #include "SPTK/conversion/spectrum_to_spectrum.h"
 #include "SPTK/conversion/waveform_to_spectrum.h"
@@ -95,9 +94,9 @@ void PrintUsage(std::ostream* stream) {
  *   - FFT length @f$(2 \le N)@f$
  * - @b -s @e double
  *   - sampling rate in kHz @f$(0 < F_s)@f$
- * - @b -L @e dobule
- *   - lowest frequency in Hz @f$(0.0 \le F_l < F_h)@f$
- * - @b -H @e dobule
+ * - @b -L @e double
+ *   - lowest frequency in Hz @f$(0 \le F_l < F_h)@f$
+ * - @b -H @e double
  *   - highest frequency in Hz @f$(F_l < F_h \le 500F_s)@f$
  * - @b -q @e int
  *   - input format
@@ -278,21 +277,29 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("fbank", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("fbank", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::SpectrumToSpectrum spectrum_to_spectrum(
       fft_length,
       static_cast<sptk::SpectrumToSpectrum::InputOutputFormats>(input_format),
-      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum, 0.0,
-      -DBL_MAX);
+      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum);
   if (kWaveform != input_format && !spectrum_to_spectrum.IsValid()) {
     std::ostringstream error_message;
     error_message << "Failed to set condition for input formatting";
@@ -302,8 +309,7 @@ int main(int argc, char* argv[]) {
 
   sptk::WaveformToSpectrum waveform_to_spectrum(
       fft_length, fft_length,
-      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum, 0.0,
-      -DBL_MAX);
+      sptk::SpectrumToSpectrum::InputOutputFormats::kPowerSpectrum);
   sptk::WaveformToSpectrum::Buffer buffer_for_spectral_analysis;
   if (kWaveform == input_format && !waveform_to_spectrum.IsValid()) {
     std::ostringstream error_message;

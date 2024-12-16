@@ -17,9 +17,9 @@
 #include "SPTK/utils/misc_utils.h"
 
 #include <algorithm>  // std::fill, std::max, std::min, std::transform
-#include <cfloat>     // DBL_MAX
 #include <cmath>      // std::atan, std::log, std::pow, std::sqrt, etc.
 #include <cstddef>    // std::size_t
+#include <vector>     // std::vector
 
 #include "SPTK/math/real_valued_fast_fourier_transform.h"
 #include "SPTK/utils/sptk_utils.h"
@@ -162,7 +162,7 @@ bool MakePseudoQuadratureMirrorFilterBanks(
   {
     // Make Kaiser window.
     const sptk::KaiserWindow kaiser_window(
-        filter_size, sptk::KaiserWindow::AttenuationToBeta(attenuation), true);
+        filter_size, sptk::KaiserWindow::AttenuationToBeta(attenuation), false);
     const std::vector<double>& window(kaiser_window.Get());
 
     // Prepare FFT.
@@ -181,7 +181,7 @@ bool MakePseudoQuadratureMirrorFilterBanks(
     // Initialize.
     double omega(sptk::kPi / (2 * num_subband));
     double step_size(initial_step_size);
-    double best_abs_error(DBL_MAX);
+    double best_abs_error(sptk::kMax);
 
     for (int i(0); i < num_iteration; ++i) {
       // Make ideal filter.
@@ -209,7 +209,7 @@ bool MakePseudoQuadratureMirrorFilterBanks(
       // Calculate error.
       const double error(real[index] * real[index] + imag[index] * imag[index] -
                          0.5);
-      const double abs_error(std::abs(error));
+      const double abs_error(std::fabs(error));
       if (abs_error < convergence_threshold) {
         if (is_converged) *is_converged = true;
         break;
@@ -221,9 +221,8 @@ bool MakePseudoQuadratureMirrorFilterBanks(
         omega += sign * step_size;
         best_abs_error = abs_error;
       } else {
-        omega += sign * step_size;
         step_size *= 0.5;  // Drop step size by half (heuristic).
-        omega -= sign * step_size;
+        omega += sign * step_size;
       }
     }
   }
@@ -234,7 +233,7 @@ bool MakePseudoQuadratureMirrorFilterBanks(
     int sign(inverse ? -1 : 1);
     for (int k(0); k < num_subband; ++k) {
       (*filter_banks)[k].resize(filter_size);
-      double* p(&(prototype_filter[0]));
+      const double* p(&(prototype_filter[0]));
       double* h(&((*filter_banks)[k][0]));
       for (int n(0); n < filter_size; ++n) {
         const double a((2 * k + 1) * sptk::kPi / (2 * num_subband) *
@@ -272,6 +271,85 @@ bool Perform1DConvolution(const std::vector<double>& f,
       output[i] += f[j] * g[i - j];
     }
   }
+  return true;
+}
+
+bool ComputeFirstOrderRegressionCoefficients(
+    int n, std::vector<double>* coefficients) {
+  if (n <= 0 || NULL == coefficients) {
+    return false;
+  }
+
+  const int a0(2 * n + 1);
+  if (coefficients->size() != static_cast<std::size_t>(a0)) {
+    coefficients->resize(a0);
+  }
+  const int a1(a0 * n * (n + 1) / 3);
+  const double norm(1.0 / a1);
+  for (int j(-n), i(0); j <= n; ++j, ++i) {
+    (*coefficients)[i] = j * norm;
+  }
+  return true;
+}
+
+bool ComputeSecondOrderRegressionCoefficients(
+    int n, std::vector<double>* coefficients) {
+  if (n <= 0 || NULL == coefficients) {
+    return false;
+  }
+
+  const int a0(2 * n + 1);
+  if (coefficients->size() != static_cast<std::size_t>(a0)) {
+    coefficients->resize(a0);
+  }
+  const int a1(a0 * n * (n + 1) / 3);
+  const int a2(a1 * (3 * n * n + 3 * n - 1) / 5);
+  const double norm(0.5 / (a2 * a0 - a1 * a1));
+  for (int j(-n), i(0); j <= n; ++j, ++i) {
+    (*coefficients)[i] = (a0 * j * j - a1) * norm;
+  }
+  return true;
+}
+
+bool ComputeLowerAndUpperBounds(double confidence_level, int num_data,
+                                const std::vector<double>& mean,
+                                const std::vector<double>& variance,
+                                std::vector<double>* lower_bound,
+                                std::vector<double>* upper_bound) {
+  if (confidence_level <= 0.0 || 100.0 <= confidence_level || num_data <= 0 ||
+      mean.size() != variance.size() || NULL == lower_bound ||
+      NULL == upper_bound) {
+    return false;
+  }
+
+  if (lower_bound->size() != mean.size()) {
+    lower_bound->resize(mean.size());
+  }
+  if (upper_bound->size() != mean.size()) {
+    upper_bound->resize(mean.size());
+  }
+
+  const int degrees_of_freedom(num_data - 1);
+  if (0 == degrees_of_freedom) {
+    return false;
+  }
+
+  double t;
+  if (!sptk::ComputePercentagePointOfTDistribution(
+          0.5 * (1.0 - confidence_level / 100.0), degrees_of_freedom, &t)) {
+    return false;
+  }
+
+  const double inverse_degrees_of_freedom(1.0 / degrees_of_freedom);
+  const int vector_length(static_cast<int>(mean.size()));
+  double* l(&((*lower_bound)[0]));
+  double* u(&((*upper_bound)[0]));
+  for (int i(0); i < vector_length; ++i) {
+    const double error(std::sqrt(variance[i] * inverse_degrees_of_freedom));
+    l[i] = mean[i] - t * error;
+    u[i] = mean[i] + t * error;
+  }
+
   return true;
 }
 

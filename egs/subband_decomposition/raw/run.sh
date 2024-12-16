@@ -21,8 +21,8 @@ sptk4=../../../bin
 data=../../../asset/data.short
 dump=dump
 
-nband=4   # Number of subbands
-order=39  # Order of filter
+nband=4  # Number of subbands
+order=39 # Order of filter
 
 mkdir -p $dump
 
@@ -35,7 +35,6 @@ $sptk4/x2x +sd $data |
 $sptk4/interpolate -l $nband -p $nband < $dump/data.ana.raw |
     $sptk4/sopr -m $nband |
     $sptk4/ipqmf -k $nband -m $order |
-    $sptk4/delay -s -$order |
     $sptk4/x2x +ds -r > $dump/data.syn.raw
 
 echo "run.sh: successfully finished"

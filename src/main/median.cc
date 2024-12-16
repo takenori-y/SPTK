@@ -14,14 +14,14 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <algorithm>  // std::sort
+#include <algorithm>  // std::partial_sort
 #include <fstream>    // std::ifstream
 #include <iomanip>    // std::setw
 #include <iostream>   // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>    // std::ostringstream
 #include <vector>     // std::vector
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
@@ -61,7 +61,9 @@ bool OutputMedian(const std::vector<std::vector<double> >& input_vectors) {
     for (int i(0); i < num_vector; ++i) {
       vector_for_sort[i] = input_vectors[i][data_index];
     }
-    std::sort(vector_for_sort.begin(), vector_for_sort.end());
+    std::partial_sort(vector_for_sort.begin(),
+                      vector_for_sort.begin() + half_num_vector + 1,
+                      vector_for_sort.end());
     const double median(0 == num_vector % 2
                             ? (vector_for_sort[half_num_vector - 1] +
                                vector_for_sort[half_num_vector]) *
@@ -196,15 +198,24 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("median", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("median", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   std::vector<std::vector<double> > input_vectors;
   if (kMagicNumberForEndOfFile != output_interval) {

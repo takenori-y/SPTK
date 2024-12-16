@@ -16,6 +16,11 @@
 
 #include "SPTK/utils/sptk_utils.h"
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #include <algorithm>  // std::fill_n, std::transform
 #include <cctype>     // std::tolower
 #include <cerrno>     // errno, ERANGE
@@ -25,6 +30,7 @@
 #include <cstdlib>    // std::strtod, std::strtol
 #include <iomanip>    // std::setw
 #include <iostream>   // std::cerr, std::endl, std::left
+#include <string>     // std::string
 
 #include "SPTK/utils/int24_t.h"
 #include "SPTK/utils/uint24_t.h"
@@ -131,7 +137,8 @@ bool ReadStream(bool zero_padding, int stream_skip, int read_point,
       return false;  // Something wrong!
     }
 
-    std::fill_n(sequence_to_read->begin() + end - num_zeros, num_zeros, 0.0);
+    std::fill_n(sequence_to_read->begin() + end - num_zeros, num_zeros,
+                static_cast<T>(0));
 
     return !input_stream->bad();
   }
@@ -249,7 +256,7 @@ bool WriteStream(int write_point, int write_size,
 template <typename T>
 bool SnPrintf(T data, const std::string& print_format, std::size_t buffer_size,
               char* buffer) {
-  if (print_format.empty() || buffer_size <= 0 || NULL == buffer) {
+  if (print_format.empty() || 0 == buffer_size || NULL == buffer) {
     return false;
   }
 
@@ -262,7 +269,7 @@ bool SnPrintf(T data, const std::string& print_format, std::size_t buffer_size,
 template <>
 bool SnPrintf(int24_t data, const std::string& print_format,
               std::size_t buffer_size, char* buffer) {
-  if (print_format.empty() || buffer_size <= 0 || NULL == buffer) {
+  if (print_format.empty() || 0 == buffer_size || NULL == buffer) {
     return false;
   }
 
@@ -277,7 +284,7 @@ bool SnPrintf(int24_t data, const std::string& print_format,
 template <>
 bool SnPrintf(uint24_t data, const std::string& print_format,
               std::size_t buffer_size, char* buffer) {
-  if (print_format.empty() || buffer_size <= 0 || NULL == buffer) {
+  if (print_format.empty() || 0 == buffer_size || NULL == buffer) {
     return false;
   }
 
@@ -331,7 +338,9 @@ bool ConvertSpecialStringToDouble(const std::string& input, double* output) {
 
   std::string lowercase_input(input);
   std::transform(input.begin(), input.end(), lowercase_input.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
+                 [](unsigned char c) {
+                   return static_cast<unsigned char>(std::tolower(c));
+                 });
   if ("pi" == lowercase_input) {
     *output = sptk::kPi;
     return true;
@@ -429,7 +438,7 @@ double AddInLogSpace(double log_x, double log_y) {
   const double greater((log_x < log_y) ? log_y : log_x);
   const double diff(smaller - greater);
   if (diff < kThresholdOfInformationLossInLogSpace) return greater;
-  return greater + std::log(std::exp(diff) + 1.0);
+  return greater + std::log1p(std::exp(diff));
 }
 
 double Warp(double omega, double alpha) {
@@ -508,6 +517,16 @@ void PrintErrorMessage(const std::string& program_name,
   std::ostringstream stream;
   stream << program_name << ": " << message.str() << "!" << std::endl;
   std::cerr << stream.str();
+}
+
+bool SetBinaryMode() {
+#ifdef _WIN32
+  if (-1 == _setmode(_fileno(stdin), _O_BINARY) ||
+      -1 == _setmode(_fileno(stdout), _O_BINARY)) {
+    return false;
+  }
+#endif
+  return true;
 }
 
 // clang-format off

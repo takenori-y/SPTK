@@ -19,6 +19,7 @@
 #include <algorithm>  // std::copy, std::fill
 #include <cmath>      // std::sin
 #include <cstddef>    // std::size_t
+#include <vector>     // std::vector
 
 namespace sptk {
 
@@ -32,7 +33,7 @@ FastFourierTransform::FastFourierTransform(int num_order, int fft_length)
       half_fft_length_(fft_length_ / 2),
       is_valid_(true) {
   if (num_order_ < 0 || fft_length_ <= num_order_ ||
-      !IsPowerOfTwo(fft_length_)) {
+      !sptk::IsPowerOfTwo(fft_length_)) {
     is_valid_ = false;
     return;
   }

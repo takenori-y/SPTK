@@ -21,13 +21,13 @@ sptk4=../../../bin
 data=../../../asset/data.short
 dump=dump
 
-sr=16          # Sample rate in kHz
-fl=$((sr*25))  # Frame length (16kHz x 25ms)
-fp=$((sr*5))   # Frame shift  (16kHz x 5ms)
-nfft=512       # FFT length
-order=24       # Order of mel-cepstrum
-alpha=0.42     # Alpha of mel-cepstrum
-size=32        # Codebook size
+sr=16           # Sample rate in kHz
+fl=$((sr * 25)) # Frame length (16kHz x 25ms)
+fp=$((sr * 5))  # Frame shift (16kHz x 5ms)
+nfft=512        # FFT length
+order=24        # Order of mel-cepstrum
+alpha=0.42      # Alpha of mel-cepstrum
+size=32         # Codebook size
 
 mkdir -p $dump
 
@@ -39,7 +39,7 @@ $sptk4/x2x +sd $data |
 
 # Extract log f0.
 $sptk4/x2x +sd $data |
-    $sptk4/pitch -p $fp -o 2 > $dump/data.lf0
+    $sptk4/pitch -s $sr -p $fp -o 2 > $dump/data.lf0
 
 # Make codebook of mel-cepstrum.
 $sptk4/lbg -m $order -e $size $dump/data.mgc > $dump/mgc.cb
@@ -68,7 +68,7 @@ $sptk4/imsvq -m 0 -s $dump/lf0.cb < $dump/enc.lf0 |
     $sptk4/sopr -magic 0 -MAGIC -1e+10 > $dump/dec.lf0
 
 # Synthesis from decoded features.
-$sptk4/sopr -magic -1e+10 -m -1 -EXP -m $((sr*1000)) -MAGIC 0 $dump/dec.lf0 |
+$sptk4/sopr -magic -1e+10 -m -1 -EXP -m $((sr * 1000)) -MAGIC 0 $dump/dec.lf0 |
     $sptk4/excite -p $fp |
     $sptk4/mglsadf -p $fp -m $order -a $alpha -P 7 $dump/dec.mgc |
     $sptk4/x2x +ds -r > $dump/data.syn.raw

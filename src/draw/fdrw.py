@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ------------------------------------------------------------------------ #
 # Copyright 2021 SPTK Working Group                                        #
 #                                                                          #
@@ -15,7 +15,6 @@
 # limitations under the License.                                           #
 # ------------------------------------------------------------------------ #
 
-import argparse
 import os
 import sys
 
@@ -26,45 +25,7 @@ import sptk.draw_utils as utils
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description="draw graphs")
-    parser.add_argument(
-        metavar="infile",
-        dest="in_file",
-        default=None,
-        nargs="?",
-        type=str,
-        help="data sequence (double)",
-    )
-    parser.add_argument(
-        metavar="outfile",
-        dest="out_file",
-        type=str,
-        help="figure",
-    )
-    parser.add_argument(
-        "-F",
-        metavar="F",
-        dest="factor",
-        default=1.0,
-        type=float,
-        help="scale of figure",
-    )
-    parser.add_argument(
-        "-W",
-        metavar="W",
-        dest="width",
-        default=None,
-        type=int,
-        help="width of figure [px]",
-    )
-    parser.add_argument(
-        "-H",
-        metavar="H",
-        dest="height",
-        default=None,
-        type=int,
-        help="height of figure [px]",
-    )
+    parser = utils.get_default_parser("draw a graph", input_name="data sequence")
     parser.add_argument(
         "-g",
         dest="grid",
@@ -142,6 +103,14 @@ def get_arguments():
         help="comma-separated graph names",
     )
     parser.add_argument(
+        "-xbias",
+        metavar="XBIAS",
+        dest="xbias",
+        default=None,
+        type=float,
+        help="bias parameter for the x-axis",
+    )
+    parser.add_argument(
         "-xscale",
         metavar="XSCALE",
         dest="xscale",
@@ -169,8 +138,8 @@ def get_arguments():
         "-lw",
         metavar="lw",
         dest="line_width",
-        default=1,
-        type=int,
+        default=None,
+        type=float,
         help="line width",
     )
     parser.add_argument(
@@ -194,7 +163,7 @@ def get_arguments():
         metavar="mw",
         dest="marker_size",
         default=None,
-        type=int,
+        type=float,
         help="marker size",
     )
     parser.add_argument(
@@ -209,8 +178,8 @@ def get_arguments():
         "-mlw",
         metavar="mlw",
         dest="marker_line_width",
-        default=1,
-        type=int,
+        default=None,
+        type=float,
         help="marker line width",
     )
     return parser.parse_args()
@@ -225,6 +194,8 @@ def get_arguments():
 #   - width of figure in pixels
 # - @b -H @e int
 #   - height of figure in pixels
+# - @b -M @e int or str
+#   - margin around image in pixels
 # - @b -g
 #   - draw grid
 # - @b -t
@@ -244,25 +215,31 @@ def get_arguments():
 # - @b -yname @e str
 #   - y-axis title
 # - @b -names @e str
-#   - comma-separated graph names
+#   - comma-separated graph names (if empty, hide legends)
+# - @b -xbias @e float
+#   - bias of x-axis
 # - @b -xscale @e float
-#   - scale of x-axis (upper limit value)
+#   - scale of x-axis
 # - @b -ls @e str
 #   - line style (solid, dash, dot, or dashdot)
 # - @b -lc @e str
 #   - line color
-# - @b -lw @e int
+# - @b -lw @e float
 #   - line width
 # - @b -ms @e int
 #   - marker symbol
 # - @b -mc @e str
 #   - marker color
-# - @b -mw @e int
+# - @b -mw @e float
 #   - marker size
 # - @b -mlc @e str
 #   - marker line color
-# - @b -mlw @e int
+# - @b -mlw @e float
 #   - marker line width
+# - @b -ff @e str
+#   - font family
+# - @b -fs @e int
+#   - font size
 # - @b infile @e str
 #   - double-type data sequence
 # - @b outfile @e str
@@ -281,19 +258,19 @@ def main():
     args = get_arguments()
 
     if args.in_file is None:
-        data = utils.read_stdin()
+        data = utils.read_stdin(dtype=args.dtype)
     else:
         if not os.path.exists(args.in_file):
             utils.print_error_message("fdrw", f"Cannot open {args.in_file}")
             sys.exit(1)
-        data = utils.read_binary(args.in_file)
+        data = utils.read_binary(args.in_file, dtype=args.dtype)
 
     if args.marker_symbol == 0:
         mode = "lines"
     else:
         mode = "lines+markers"
 
-    if args.names is None:
+    if args.names is None or len(args.names) == 0:
         names = None
     else:
         names = args.names.split(",")
@@ -306,6 +283,8 @@ def main():
     x = np.arange(step)
     if args.xscale is not None and 2 <= step:
         x = x * (args.xscale / (step - 1))
+    if args.xbias is not None:
+        x = x + args.xbias
 
     fig = go.Figure()
     for i, j in enumerate(range(0, len(data), step)):
@@ -318,6 +297,7 @@ def main():
                     y=x if args.transpose else y,
                     name=None if names is None else names[i],
                     orientation="h" if args.transpose else "v",
+                    width=args.line_width,
                     marker=dict(
                         color=args.marker_color,
                         line_color=args.marker_line_color,
@@ -357,6 +337,12 @@ def main():
             range=args.xlim if args.transpose else args.ylim,
             showgrid=args.grid,
         ),
+        font=dict(
+            family=args.font_family,
+            size=args.font_size,
+        ),
+        margin=args.margin,
+        showlegend=names is not None,
     )
     fig.write_image(
         args.out_file, width=args.width, height=args.height, scale=args.factor

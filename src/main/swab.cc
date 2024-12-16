@@ -15,8 +15,8 @@
 // ------------------------------------------------------------------------ //
 
 #include <algorithm>  // std::reverse
-#include <climits>    // INT_MAX
 #include <cstdint>    // int16_t, int32_t, int64_t, etc.
+#include <cstdio>     // EOF
 #include <cstring>    // std::strncmp
 #include <fstream>    // std::ifstream
 #include <iomanip>    // std::setw
@@ -24,17 +24,18 @@
 #include <sstream>    // std::ostringstream
 #include <string>     // std::string
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/utils/int24_t.h"
 #include "SPTK/utils/sptk_utils.h"
 #include "SPTK/utils/uint24_t.h"
 
 namespace {
 
+const int kMagicNumberForEnd(-1);
 const int kDefaultStartAddress(0);
 const int kDefaultStartOffset(0);
-const int kDefaultEndAddress(INT_MAX);
-const int kDefaultEndOffset(INT_MAX);
+const int kDefaultEndAddress(kMagicNumberForEnd);
+const int kDefaultEndOffset(kMagicNumberForEnd);
 const char* kDefaultDataType("s");
 
 void PrintUsage(std::ostream* stream) {
@@ -69,8 +70,7 @@ void PrintUsage(std::ostream* stream) {
 
 class ByteSwapInterface {
  public:
-  virtual ~ByteSwapInterface() {
-  }
+  virtual ~ByteSwapInterface() = default;
 
   virtual bool Run(std::istream* input_stream) const = 0;
 };
@@ -85,10 +85,10 @@ class ByteSwap : public ByteSwapInterface {
         end_offset_(end_offset) {
   }
 
-  ~ByteSwap() {
+  ~ByteSwap() override {
   }
 
-  virtual bool Run(std::istream* input_stream) const {
+  bool Run(std::istream* input_stream) const override {
     // Skip data.
     const int data_size(static_cast<int>(sizeof(T)));
     const int skip_size(start_address_ + data_size * start_offset_);
@@ -101,16 +101,17 @@ class ByteSwap : public ByteSwapInterface {
     } else {
       input_stream->seekg(skip_size);
     }
-    input_stream->peek();
-    if (!input_stream->good()) {
+    const int c(input_stream->peek());
+    if (EOF == c || input_stream->fail()) {
       return false;
     }
 
     // Swap data.
     T data;
     for (int address(skip_size), offset(start_offset_);
-         ((address <= end_address_) && (offset <= end_offset_) &&
-          sptk::ReadStream(&data, input_stream));
+         (kMagicNumberForEnd == end_address_ || address <= end_address_) &&
+         (kMagicNumberForEnd == end_offset_ || offset <= end_offset_) &&
+         sptk::ReadStream(&data, input_stream);
          address += data_size, ++offset) {
       unsigned char* p(reinterpret_cast<unsigned char*>(&data));
       std::reverse(p, p + data_size);
@@ -313,7 +314,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (end_address < start_address) {
+  if (kMagicNumberForEnd != end_address && end_address < start_address) {
     std::ostringstream error_message;
     error_message << "End address must be equal to or greater than "
                   << "start address";
@@ -321,7 +322,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (end_offset < start_offset) {
+  if (kMagicNumberForEnd != end_offset && end_offset < start_offset) {
     std::ostringstream error_message;
     error_message << "End offset number must be equal to or greater than "
                   << "start offset number";
@@ -345,15 +346,24 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("swab", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("swab", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   ByteSwapWrapper swap_byte(data_type, start_address, start_offset, end_address,
                             end_offset);

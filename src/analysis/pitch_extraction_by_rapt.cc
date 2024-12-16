@@ -18,6 +18,7 @@
 
 #include <algorithm>  // std::copy, std::fill
 #include <cmath>      // std::ceil
+#include <vector>     // std::vector
 
 #include "Snack/jkGetF0.h"
 
@@ -34,9 +35,8 @@ PitchExtractionByRapt::PitchExtractionByRapt(int frame_shift,
       voicing_threshold_(voicing_threshold),
       is_valid_(true) {
   if (frame_shift_ <= 0 || sampling_rate_ / 2 <= upper_f0_ ||
-      (sampling_rate_ <= 6000.0 || 98000.0 <= sampling_rate_) ||
-      (lower_f0_ <= 10.0 || upper_f0_ <= lower_f0_) ||
-      (voicing_threshold_ < -0.6 || 0.7 < voicing_threshold_)) {
+      (sampling_rate_ <= 6000.0 || 98000.0 < sampling_rate_) ||
+      (lower_f0_ <= 10.0 || upper_f0_ <= lower_f0_)) {
     is_valid_ = false;
     return;
   }

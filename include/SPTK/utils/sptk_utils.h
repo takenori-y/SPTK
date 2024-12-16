@@ -19,6 +19,7 @@
 
 #include <cstddef>   // std::size_t
 #include <iostream>  // std::istream, std::ostream
+#include <limits>    // std::numeric_limits
 #include <sstream>   // std::ostringstream
 #include <string>    // std::string
 #include <vector>    // std::vector
@@ -35,7 +36,7 @@
 namespace sptk {
 
 //! Version of SPTK.
-static const char* const kVersion("4.0");
+static const char* const kVersion("4.2");
 //! @f$\pi@f$
 static const double kPi(3.141592653589793);
 //! @f$2\pi@f$
@@ -47,7 +48,11 @@ static const double kOctave(1.442695040888963);
 //! @f$\ln(2)@f$
 static const double kLogTwo(0.693147180559945);
 //! @f$\ln(0)@f$
-static const double kLogZero(-1.0e+10);
+static const double kLogZero(-1e+10);
+//! -DBL_MAX
+static const double kMin(std::numeric_limits<double>::lowest());
+//! DBL_MAX
+static const double kMax(std::numeric_limits<double>::max());
 
 /**
  * @param[out] data_to_read Scalar.
@@ -273,6 +278,11 @@ void PrintDataType(const std::string& symbol, std::ostream* stream);
  */
 void PrintErrorMessage(const std::string& program_name,
                        const std::ostringstream& message);
+
+/**
+ * Set standard input/output to binary mode.
+ */
+bool SetBinaryMode();
 
 }  // namespace sptk
 

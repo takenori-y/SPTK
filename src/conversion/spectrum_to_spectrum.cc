@@ -17,9 +17,9 @@
 #include "SPTK/conversion/spectrum_to_spectrum.h"
 
 #include <algorithm>  // std::copy, std::max, std::max_element, std::transform
-#include <cfloat>     // DBL_MAX
 #include <cmath>      // std::exp, std::log, std::log10, std::pow, std::sqrt
 #include <cstddef>    // std::size_t
+#include <vector>     // std::vector
 
 namespace {
 
@@ -28,7 +28,8 @@ class LogAmplitudeSpectrumInDecibelsToLogAmplitudeSpectrum
  public:
   LogAmplitudeSpectrumInDecibelsToLogAmplitudeSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return x / sptk::kNeper; });
@@ -45,7 +46,8 @@ class LogAmplitudeSpectrumInDecibelsToAmplitudeSpectrum
  public:
   LogAmplitudeSpectrumInDecibelsToAmplitudeSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return std::pow(10.0, 0.05 * x); });
@@ -61,7 +63,8 @@ class LogAmplitudeSpectrumInDecibelsToPowerSpectrum
  public:
   LogAmplitudeSpectrumInDecibelsToPowerSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return std::pow(10.0, 0.1 * x); });
@@ -77,7 +80,8 @@ class LogAmplitudeSpectrumToLogAmplitudeSpectrumInDecibels
  public:
   LogAmplitudeSpectrumToLogAmplitudeSpectrumInDecibels() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return x * sptk::kNeper; });
@@ -94,7 +98,8 @@ class LogAmplitudeSpectrumToAmplitudeSpectrum
  public:
   LogAmplitudeSpectrumToAmplitudeSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return std::exp(x); });
@@ -110,7 +115,8 @@ class LogAmplitudeSpectrumToPowerSpectrum
  public:
   LogAmplitudeSpectrumToPowerSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return std::exp(2.0 * x); });
@@ -126,7 +132,8 @@ class AmplitudeSpectrumToLogAmplitudeSpectrumInDecibels
  public:
   AmplitudeSpectrumToLogAmplitudeSpectrumInDecibels() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return 20.0 * std::log10(x); });
@@ -142,7 +149,8 @@ class AmplitudeSpectrumToLogAmplitudeSpectrum
  public:
   AmplitudeSpectrumToLogAmplitudeSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return std::log(x); });
@@ -158,7 +166,8 @@ class AmplitudeSpectrumToPowerSpectrum
  public:
   AmplitudeSpectrumToPowerSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(), [](double x) { return x * x; });
     return true;
@@ -173,7 +182,8 @@ class PowerSpectrumToLogAmplitudeSpectrumInDecibels
  public:
   PowerSpectrumToLogAmplitudeSpectrumInDecibels() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return 10.0 * std::log10(x); });
@@ -189,7 +199,8 @@ class PowerSpectrumToLogAmplitudeSpectrum
  public:
   PowerSpectrumToLogAmplitudeSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return 0.5 * std::log(x); });
@@ -205,7 +216,8 @@ class PowerSpectrumToAmplitudeSpectrum
  public:
   PowerSpectrumToAmplitudeSpectrum() {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [](double x) { return std::sqrt(x); });
@@ -220,7 +232,8 @@ class Addition : public sptk::SpectrumToSpectrum::OperationInterface {
  public:
   explicit Addition(double addend) : addend_(addend) {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     std::transform(input_and_output->begin(), input_and_output->end(),
                    input_and_output->begin(),
                    [this](double x) { return x + addend_; });
@@ -238,7 +251,8 @@ class FlooringOnLogarithm
   explicit FlooringOnLogarithm(double relative_floor)
       : relative_floor_(relative_floor) {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     const double max_value(
         *std::max_element(input_and_output->begin(), input_and_output->end()));
     const double floor(max_value + relative_floor_);
@@ -258,7 +272,8 @@ class FlooringOnLinear : public sptk::SpectrumToSpectrum::OperationInterface {
   explicit FlooringOnLinear(double relative_floor)
       : relative_floor_(relative_floor) {
   }
-  virtual bool Run(std::vector<double>* input_and_output) const {
+
+  bool Run(std::vector<double>* input_and_output) const override {
     const double max_value(
         *std::max_element(input_and_output->begin(), input_and_output->end()));
     const double floor(max_value * relative_floor_);
@@ -401,10 +416,10 @@ SpectrumToSpectrum::SpectrumToSpectrum(int fft_length,
       epsilon_(epsilon),
       relative_floor_in_decibels_(relative_floor_in_decibels),
       is_valid_(true) {
-  if (fft_length_ <= 0 || !IsPowerOfTwo(fft_length_) || input_format_ < 0 ||
-      kNumInputOutputFormats <= input_format_ || output_format_ < 0 ||
-      kNumInputOutputFormats <= output_format_ || epsilon_ < 0.0 ||
-      0.0 <= relative_floor_in_decibels_) {
+  if (fft_length_ <= 0 || !sptk::IsPowerOfTwo(fft_length_) ||
+      input_format_ < 0 || kNumInputOutputFormats <= input_format_ ||
+      output_format_ < 0 || kNumInputOutputFormats <= output_format_ ||
+      epsilon_ < 0.0 || 0.0 <= relative_floor_in_decibels_) {
     is_valid_ = false;
     return;
   }
@@ -417,7 +432,7 @@ SpectrumToSpectrum::SpectrumToSpectrum(int fft_length,
     SelectOperation(input_format_, output_format_, &operations_);
   }
 
-  if (-DBL_MAX != relative_floor_in_decibels_) {
+  if (sptk::kMin != relative_floor_in_decibels_) {
     switch (output_format_) {
       case kLogAmplitudeSpectrumInDecibels: {
         operations_.push_back(

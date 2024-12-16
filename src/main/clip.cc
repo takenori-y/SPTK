@@ -14,20 +14,19 @@
 // limitations under the License.                                           //
 // ------------------------------------------------------------------------ //
 
-#include <cfloat>    // DBL_MAX
 #include <fstream>   // std::ifstream
 #include <iomanip>   // std::setw
 #include <iostream>  // std::cerr, std::cin, std::cout, std::endl, etc.
 #include <sstream>   // std::ostringstream
 
-#include "Getopt/getoptwin.h"
+#include "GETOPT/ya_getopt.h"
 #include "SPTK/math/scalar_operation.h"
 #include "SPTK/utils/sptk_utils.h"
 
 namespace {
 
-const double kDefaultLowerBound(-DBL_MAX);
-const double kDefaultUpperBound(DBL_MAX);
+const double kDefaultLowerBound(sptk::kMin);
+const double kDefaultUpperBound(sptk::kMax);
 
 void PrintUsage(std::ostream* stream) {
   // clang-format off
@@ -137,25 +136,34 @@ int main(int argc, char* argv[]) {
   }
   const char* input_file(0 == num_input_files ? NULL : argv[optind]);
 
-  std::ifstream ifs;
-  ifs.open(input_file, std::ios::in | std::ios::binary);
-  if (ifs.fail() && NULL != input_file) {
+  if (!sptk::SetBinaryMode()) {
     std::ostringstream error_message;
-    error_message << "Cannot open file " << input_file;
+    error_message << "Cannot set translation mode";
     sptk::PrintErrorMessage("clip", error_message);
     return 1;
   }
-  std::istream& input_stream(ifs.fail() ? std::cin : ifs);
+
+  std::ifstream ifs;
+  if (NULL != input_file) {
+    ifs.open(input_file, std::ios::in | std::ios::binary);
+    if (ifs.fail()) {
+      std::ostringstream error_message;
+      error_message << "Cannot open file " << input_file;
+      sptk::PrintErrorMessage("clip", error_message);
+      return 1;
+    }
+  }
+  std::istream& input_stream(ifs.is_open() ? ifs : std::cin);
 
   sptk::ScalarOperation scalar_operation;
-  if (-DBL_MAX != lower_bound &&
+  if (sptk::kMin != lower_bound &&
       !scalar_operation.AddLowerBoundingOperation(lower_bound)) {
     std::ostringstream error_message;
     error_message << "Failed to add lower bounding operation";
     sptk::PrintErrorMessage("clip", error_message);
     return 1;
   }
-  if (DBL_MAX != upper_bound &&
+  if (sptk::kMax != upper_bound &&
       !scalar_operation.AddUpperBoundingOperation(upper_bound)) {
     std::ostringstream error_message;
     error_message << "Failed to add upper bounding operation";
