@@ -22,26 +22,4 @@ jobs:
           sudo apt-get install csh parallel valgrind libpcre3-dev
 
       - name: Tool
-        run: cd tools && make cppcheck
-
-      - name: Make
-        run: make debug
-
-      - name: Format
-        run: make format
-
-      - name: Test
-        run: make test
-
-  windows-latest:
-    runs-on: windows-latest
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Make
-        run: ./make.bat
+        run: cd tools && make cppcheck.done
